@@ -148,7 +148,7 @@ extern float b2_lengthUnitsPerMeter;
 #define b2_linearSlop ( 0.005f * b2_lengthUnitsPerMeter )
 
 // Maximum number of simultaneous worlds that can be allocated
-#define b2_maxWorlds 128
+#define b2_maxWorlds 64000
 
 // The maximum rotation of a body per time step. This limit is very large and is used
 // to prevent numerical problems. You shouldn't need to adjust this.

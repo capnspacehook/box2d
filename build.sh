@@ -4,5 +4,5 @@
 rm -rf build
 mkdir build
 cd build
-cmake -DBOX2D_BUILD_DOCS=OFF ..
-cmake --build .
+cmake -DBOX2D_BUILD_DOCS=OFF DBOX2D_BUILD_STATIC=ON -DBOX2D_BUILD_SHARED=OFF ..
+cmake --build . 
