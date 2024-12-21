@@ -5,6 +5,7 @@
 #define _CRTDBG_MAP_ALLOC
 #define IMGUI_DISABLE_OBSOLETE_FUNCTIONS 1
 
+#include "TaskScheduler.h"
 #include "draw.h"
 #include "sample.h"
 #include "settings.h"
@@ -111,7 +112,7 @@ static inline int CompareSamples( const void* a, const void* b )
 	return result;
 }
 
-static void SortTests()
+static void SortSamples()
 {
 	qsort( g_sampleEntries, g_sampleCount, sizeof( SampleEntry ), CompareSamples );
 }
@@ -151,8 +152,10 @@ static void CreateUI( GLFWwindow* window, const char* glslVersion )
 	{
 		ImFontConfig fontConfig;
 		fontConfig.RasterizerMultiply = s_windowScale * s_framebufferScale;
-		ImGui::GetIO().Fonts->AddFontFromFileTTF( fontPath, 14.0f, &fontConfig );
-		ImGui::GetIO().Fonts->AddFontFromFileTTF( fontPath, 48.0f, &fontConfig );
+		g_draw.m_smallFont = ImGui::GetIO().Fonts->AddFontFromFileTTF( fontPath, 14.0f, &fontConfig );
+		g_draw.m_regularFont = ImGui::GetIO().Fonts->AddFontFromFileTTF( fontPath, 18.0f, &fontConfig );
+		g_draw.m_mediumFont = ImGui::GetIO().Fonts->AddFontFromFileTTF( fontPath, 40.0f, &fontConfig );
+		g_draw.m_largeFont = ImGui::GetIO().Fonts->AddFontFromFileTTF( fontPath, 64.0f, &fontConfig );
 	}
 	else
 	{
@@ -462,7 +465,7 @@ static void UpdateUI()
 
 			ImGuiTreeNodeFlags nodeFlags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
 
-			if ( ImGui::BeginTabItem( "Tests" ) )
+			if ( ImGui::BeginTabItem( "Samples" ) )
 			{
 				int categoryIndex = 0;
 				const char* category = g_sampleEntries[categoryIndex].category;
@@ -527,7 +530,7 @@ int main( int, char** )
 
 	// How to break at the leaking allocation, in the watch window enter this variable
 	// and set it to the allocation number in {}. Do this at the first line in main.
-	// {,,ucrtbased.dll}_crtBreakAlloc = <allocation number> 3970
+	// {,,ucrtbased.dll}_crtBreakAlloc = <allocation number>
 #endif
 
 	// Install memory hooks
@@ -538,7 +541,8 @@ int main( int, char** )
 
 	s_settings.Load();
 	s_settings.workerCount = b2MinInt( 8, (int)enki::GetNumHardwareThreads() / 2 );
-	SortTests();
+
+	SortSamples();
 
 	glfwSetErrorCallback( glfwErrorCallback );
 
@@ -706,7 +710,7 @@ int main( int, char** )
 
 		// ImGui::ShowDemoWindow();
 
-		// if (g_draw.m_showUI)
+		if ( g_draw.m_showUI )
 		{
 			snprintf( buffer, 128, "%.1f ms - step %d - camera (%g, %g, %g)", 1000.0f * frameTime, s_sample->m_stepCount,
 					  g_camera.m_center.x, g_camera.m_center.y, g_camera.m_zoom );

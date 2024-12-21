@@ -3,6 +3,7 @@
 
 #include "box2d/types.h"
 
+#include "constants.h"
 #include "core.h"
 
 b2WorldDef b2DefaultWorldDef( void )
@@ -12,13 +13,13 @@ b2WorldDef b2DefaultWorldDef( void )
 	def.gravity.y = -10.0f;
 	def.hitEventThreshold = 1.0f * b2_lengthUnitsPerMeter;
 	def.restitutionThreshold = 1.0f * b2_lengthUnitsPerMeter;
-	def.contactPushoutVelocity = 3.0f * b2_lengthUnitsPerMeter;
+	def.contactPushSpeed = 3.0f * b2_lengthUnitsPerMeter;
 	def.contactHertz = 30.0;
 	def.contactDampingRatio = 10.0f;
 	def.jointHertz = 60.0;
 	def.jointDampingRatio = 2.0f;
 	// 400 meters per second, faster than the speed of sound
-	def.maximumLinearVelocity = 400.0f * b2_lengthUnitsPerMeter;
+	def.maximumLinearSpeed = 400.0f * b2_lengthUnitsPerMeter;
 	def.frictionMixingRule = b2_mixGeometricMean;
 	def.restitutionMixingRule = b2_mixMaximum;
 	def.enableSleep = true;
@@ -60,7 +61,6 @@ b2ShapeDef b2DefaultShapeDef( void )
 	def.density = 1.0f;
 	def.filter = b2DefaultFilter();
 	def.enableSensorEvents = true;
-	def.enableContactEvents = true;
 	def.updateBodyMass = true;
 	def.internalValue = B2_SECRET_COOKIE;
 	return def;

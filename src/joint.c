@@ -25,7 +25,7 @@ b2DistanceJointDef b2DefaultDistanceJointDef( void )
 {
 	b2DistanceJointDef def = { 0 };
 	def.length = 1.0f;
-	def.maxLength = b2_huge;
+	def.maxLength = B2_HUGE;
 	def.internalValue = B2_SECRET_COOKIE;
 	return def;
 }
@@ -110,7 +110,7 @@ b2JointSim* b2GetJointSim( b2World* world, b2Joint* joint )
 {
 	if ( joint->setIndex == b2_awakeSet )
 	{
-		B2_ASSERT( 0 <= joint->colorIndex && joint->colorIndex < b2_graphColorCount );
+		B2_ASSERT( 0 <= joint->colorIndex && joint->colorIndex < B2_GRAPH_COLOR_COUNT );
 		b2GraphColor* color = world->constraintGraph.colors + joint->colorIndex;
 		return b2JointSimArray_Get( &color->jointSims, joint->localIndex );
 	}
@@ -356,7 +356,7 @@ b2JointId b2CreateDistanceJoint( b2WorldId worldId, const b2DistanceJointDef* de
 
 	B2_ASSERT( b2Body_IsValid( def->bodyIdA ) );
 	B2_ASSERT( b2Body_IsValid( def->bodyIdB ) );
-	B2_ASSERT( b2IsValid( def->length ) && def->length > 0.0f );
+	B2_ASSERT( b2IsValidFloat( def->length ) && def->length > 0.0f );
 
 	b2Body* bodyA = b2GetBodyFullId( world, def->bodyIdA );
 	b2Body* bodyB = b2GetBodyFullId( world, def->bodyIdB );
@@ -370,10 +370,10 @@ b2JointId b2CreateDistanceJoint( b2WorldId worldId, const b2DistanceJointDef* de
 
 	b2DistanceJoint empty = { 0 };
 	joint->distanceJoint = empty;
-	joint->distanceJoint.length = b2MaxFloat( def->length, b2_linearSlop );
+	joint->distanceJoint.length = b2MaxFloat( def->length, B2_LINEAR_SLOP );
 	joint->distanceJoint.hertz = def->hertz;
 	joint->distanceJoint.dampingRatio = def->dampingRatio;
-	joint->distanceJoint.minLength = b2MaxFloat( def->minLength, b2_linearSlop );
+	joint->distanceJoint.minLength = b2MaxFloat( def->minLength, B2_LINEAR_SLOP );
 	joint->distanceJoint.maxLength = b2MaxFloat( def->minLength, def->maxLength );
 	joint->distanceJoint.maxMotorForce = def->maxMotorForce;
 	joint->distanceJoint.motorSpeed = def->motorSpeed;
@@ -522,7 +522,7 @@ b2JointId b2CreateRevoluteJoint( b2WorldId worldId, const b2RevoluteJointDef* de
 	b2RevoluteJoint empty = { 0 };
 	joint->revoluteJoint = empty;
 
-	joint->revoluteJoint.referenceAngle = b2ClampFloat( def->referenceAngle, -b2_pi, b2_pi );
+	joint->revoluteJoint.referenceAngle = b2ClampFloat( def->referenceAngle, -B2_PI, B2_PI );
 	joint->revoluteJoint.linearImpulse = b2Vec2_zero;
 	joint->revoluteJoint.axialMass = 0.0f;
 	joint->revoluteJoint.springImpulse = 0.0f;
@@ -533,8 +533,8 @@ b2JointId b2CreateRevoluteJoint( b2WorldId worldId, const b2RevoluteJointDef* de
 	joint->revoluteJoint.dampingRatio = def->dampingRatio;
 	joint->revoluteJoint.lowerAngle = b2MinFloat( def->lowerAngle, def->upperAngle );
 	joint->revoluteJoint.upperAngle = b2MaxFloat( def->lowerAngle, def->upperAngle );
-	joint->revoluteJoint.lowerAngle = b2ClampFloat( joint->revoluteJoint.lowerAngle, -b2_pi, b2_pi );
-	joint->revoluteJoint.upperAngle = b2ClampFloat( joint->revoluteJoint.upperAngle, -b2_pi, b2_pi );
+	joint->revoluteJoint.lowerAngle = b2ClampFloat( joint->revoluteJoint.lowerAngle, -B2_PI, B2_PI );
+	joint->revoluteJoint.upperAngle = b2ClampFloat( joint->revoluteJoint.upperAngle, -B2_PI, B2_PI );
 	joint->revoluteJoint.maxMotorTorque = def->maxMotorTorque;
 	joint->revoluteJoint.motorSpeed = def->motorSpeed;
 	joint->revoluteJoint.enableSpring = def->enableSpring;
@@ -1182,8 +1182,8 @@ void b2PrepareOverflowJoints( b2StepContext* context )
 	b2TracyCZoneNC( prepare_joints, "PrepJoints", b2_colorOldLace, true );
 
 	b2ConstraintGraph* graph = context->graph;
-	b2JointSim* joints = graph->colors[b2_overflowIndex].jointSims.data;
-	int jointCount = graph->colors[b2_overflowIndex].jointSims.count;
+	b2JointSim* joints = graph->colors[B2_OVERFLOW_INDEX].jointSims.data;
+	int jointCount = graph->colors[B2_OVERFLOW_INDEX].jointSims.count;
 
 	for ( int i = 0; i < jointCount; ++i )
 	{
@@ -1199,8 +1199,8 @@ void b2WarmStartOverflowJoints( b2StepContext* context )
 	b2TracyCZoneNC( prepare_joints, "PrepJoints", b2_colorOldLace, true );
 
 	b2ConstraintGraph* graph = context->graph;
-	b2JointSim* joints = graph->colors[b2_overflowIndex].jointSims.data;
-	int jointCount = graph->colors[b2_overflowIndex].jointSims.count;
+	b2JointSim* joints = graph->colors[B2_OVERFLOW_INDEX].jointSims.data;
+	int jointCount = graph->colors[B2_OVERFLOW_INDEX].jointSims.count;
 
 	for ( int i = 0; i < jointCount; ++i )
 	{
@@ -1216,8 +1216,8 @@ void b2SolveOverflowJoints( b2StepContext* context, bool useBias )
 	b2TracyCZoneNC( solve_joints, "SolveJoints", b2_colorLemonChiffon, true );
 
 	b2ConstraintGraph* graph = context->graph;
-	b2JointSim* joints = graph->colors[b2_overflowIndex].jointSims.data;
-	int jointCount = graph->colors[b2_overflowIndex].jointSims.count;
+	b2JointSim* joints = graph->colors[B2_OVERFLOW_INDEX].jointSims.data;
+	int jointCount = graph->colors[B2_OVERFLOW_INDEX].jointSims.count;
 
 	for ( int i = 0; i < jointCount; ++i )
 	{
@@ -1266,7 +1266,7 @@ void b2DrawJoint( b2DebugDraw* draw, b2World* world, b2Joint* joint )
 			draw->DrawPoint( target, 4.0f, c1, draw->context );
 			draw->DrawPoint( pB, 4.0f, c1, draw->context );
 
-			b2HexColor c2 = b2_colorGray8;
+			b2HexColor c2 = b2_colorLightGray;
 			draw->DrawSegment( target, pB, c2, draw->context );
 		}
 		break;
@@ -1297,9 +1297,9 @@ void b2DrawJoint( b2DebugDraw* draw, b2World* world, b2Joint* joint )
 
 	if ( draw->drawGraphColors )
 	{
-		b2HexColor colors[b2_graphColorCount] = { b2_colorRed,		 b2_colorOrange,	b2_colorYellow, b2_colorGreen,
+		b2HexColor colors[B2_GRAPH_COLOR_COUNT] = { b2_colorRed,		 b2_colorOrange,	b2_colorYellow, b2_colorGreen,
 												  b2_colorCyan,		 b2_colorBlue,		b2_colorViolet, b2_colorPink,
-												  b2_colorChocolate, b2_colorGoldenrod, b2_colorCoral,	b2_colorBlack };
+												  b2_colorChocolate, b2_colorGoldenRod, b2_colorCoral,	b2_colorBlack };
 
 		int colorIndex = joint->colorIndex;
 		if ( colorIndex != B2_NULL_INDEX )

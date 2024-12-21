@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2023 Erin Catto
 // SPDX-License-Identifier: MIT
 
-#include "test_macros.h"
-
+#include "constants.h"
 #include "core.h"
+#include "test_macros.h"
 
 #include "box2d/box2d.h"
 #include "box2d/collision.h"
@@ -297,7 +297,7 @@ int TestForAmy( void )
 	return 0;
 }
 
-#define WORLD_COUNT (b2_maxWorlds/2)
+#define WORLD_COUNT ( B2_MAX_WORLDS / 2 )
 
 int TestWorldRecycle( void )
 {
@@ -307,10 +307,10 @@ int TestWorldRecycle( void )
 
 	b2WorldId worldIds[WORLD_COUNT];
 
-	for (int i = 0; i < count; ++i)
+	for ( int i = 0; i < count; ++i )
 	{
 		b2WorldDef worldDef = b2DefaultWorldDef();
-		for (int j = 0; j < WORLD_COUNT; ++j)
+		for ( int j = 0; j < WORLD_COUNT; ++j )
 		{
 			worldIds[j] = b2CreateWorld( &worldDef );
 			ENSURE( b2World_IsValid( worldIds[j] ) == true );
@@ -319,7 +319,7 @@ int TestWorldRecycle( void )
 			b2CreateBody( worldIds[j], &bodyDef );
 		}
 
-		for (int j = 0; j < WORLD_COUNT; ++j)
+		for ( int j = 0; j < WORLD_COUNT; ++j )
 		{
 			float timeStep = 1.0f / 60.0f;
 			int subStepCount = 1;
@@ -341,6 +341,88 @@ int TestWorldRecycle( void )
 	return 0;
 }
 
+static bool CustomFilter( b2ShapeId shapeIdA, b2ShapeId shapeIdB, void* context )
+{
+	(void)shapeIdA;
+	(void)shapeIdB;
+	ENSURE( context == NULL );
+	return true;
+}
+
+static bool PreSolveStatic( b2ShapeId shapeIdA, b2ShapeId shapeIdB, b2Manifold* manifold, void* context )
+{
+	(void)shapeIdA;
+	(void)shapeIdB;
+	(void)manifold;
+	ENSURE( context == NULL );
+	return false;
+}
+
+// This test is here to ensure all API functions link correctly.
+int TestWorldCoverage( void )
+{
+	b2WorldDef worldDef = b2DefaultWorldDef();
+
+	b2WorldId worldId = b2CreateWorld( &worldDef );
+	ENSURE( b2World_IsValid( worldId ) );
+
+	b2World_EnableSleeping( worldId, true );
+	b2World_EnableSleeping( worldId, false );
+	bool flag = b2World_IsSleepingEnabled( worldId );
+	ENSURE( flag == false );
+
+	b2World_EnableContinuous( worldId, false );
+	b2World_EnableContinuous( worldId, true );
+	flag = b2World_IsContinuousEnabled( worldId );
+	ENSURE( flag == true );
+
+	b2World_SetRestitutionThreshold( worldId, 0.0f );
+	b2World_SetRestitutionThreshold( worldId, 2.0f );
+	float value = b2World_GetRestitutionThreshold( worldId );
+	ENSURE( value == 2.0f );
+
+	b2World_SetHitEventThreshold( worldId, 0.0f );
+	b2World_SetHitEventThreshold( worldId, 100.0f );
+	value = b2World_GetHitEventThreshold( worldId );
+	ENSURE( value == 100.0f );
+
+	b2World_SetCustomFilterCallback( worldId, CustomFilter, NULL );
+	b2World_SetPreSolveCallback( worldId, PreSolveStatic, NULL );
+
+	b2Vec2 g = { 1.0f, 2.0f };
+	b2World_SetGravity( worldId, g );
+	b2Vec2 v = b2World_GetGravity( worldId );
+	ENSURE( v.x == g.x );
+	ENSURE( v.y == g.y );
+
+	b2ExplosionDef explosionDef = b2DefaultExplosionDef();
+	b2World_Explode( worldId, &explosionDef );
+
+	b2World_SetContactTuning( worldId, 10.0f, 2.0f, 4.0f );
+	b2World_SetJointTuning( worldId, 10.0f, 2.0f );
+
+	b2World_SetMaximumLinearSpeed( worldId, 10.0f );
+	value = b2World_GetMaximumLinearSpeed( worldId );
+	ENSURE( value == 10.0f );
+
+	b2World_EnableWarmStarting( worldId, true );
+	flag = b2World_IsWarmStartingEnabled( worldId );
+	ENSURE( flag == true );
+
+	int count = b2World_GetAwakeBodyCount( worldId );
+	ENSURE( count == 0 );
+
+	b2World_SetUserData( worldId, &value );
+	void* userData = b2World_GetUserData( worldId );
+	ENSURE( userData == &value );
+
+	b2World_Step( worldId, 1.0f, 1 );
+
+	b2DestroyWorld( worldId );
+
+	return 0;
+}
+
 int WorldTest( void )
 {
 	RUN_SUBTEST( TestForAmy );
@@ -349,6 +431,7 @@ int WorldTest( void )
 	RUN_SUBTEST( DestroyAllBodiesWorld );
 	RUN_SUBTEST( TestIsValid );
 	RUN_SUBTEST( TestWorldRecycle );
+	RUN_SUBTEST( TestWorldCoverage );
 
 	return 0;
 }

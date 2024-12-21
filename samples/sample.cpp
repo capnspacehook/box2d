@@ -4,27 +4,44 @@
 #include "sample.h"
 
 #include "draw.h"
+#include "imgui.h"
+#include "random.h"
 #include "settings.h"
 
 #include "box2d/box2d.h"
-#include "box2d/collision.h"
 #include "box2d/math_functions.h"
 
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "TaskScheduler.h"
+
+class SampleTask : public enki::ITaskSet
+{
+public:
+	SampleTask() = default;
+
+	void ExecuteRange( enki::TaskSetPartition range, uint32_t threadIndex ) override
+	{
+		m_task( range.start, range.end, threadIndex, m_taskContext );
+	}
+
+	b2TaskCallback* m_task = nullptr;
+	void* m_taskContext = nullptr;
+};
+
 static void* EnqueueTask( b2TaskCallback* task, int32_t itemCount, int32_t minRange, void* taskContext, void* userContext )
 {
 	Sample* sample = static_cast<Sample*>( userContext );
-	if ( sample->m_taskCount < maxTasks )
+	if ( sample->m_taskCount < Sample::m_maxTasks )
 	{
 		SampleTask& sampleTask = sample->m_tasks[sample->m_taskCount];
 		sampleTask.m_SetSize = itemCount;
 		sampleTask.m_MinRange = minRange;
 		sampleTask.m_task = task;
 		sampleTask.m_taskContext = taskContext;
-		sample->m_scheduler.AddTaskSetToPipe( &sampleTask );
+		sample->m_scheduler->AddTaskSetToPipe( &sampleTask );
 		++sample->m_taskCount;
 		return &sampleTask;
 	}
@@ -43,7 +60,7 @@ static void FinishTask( void* taskPtr, void* userContext )
 	{
 		SampleTask* sampleTask = static_cast<SampleTask*>( taskPtr );
 		Sample* sample = static_cast<Sample*>( userContext );
-		sample->m_scheduler.WaitforTask( sampleTask );
+		sample->m_scheduler->WaitforTask( sampleTask );
 	}
 }
 
@@ -77,7 +94,10 @@ static void TestMathCpp()
 
 Sample::Sample( Settings& settings )
 {
-	m_scheduler.Initialize( settings.workerCount );
+	m_scheduler = new enki::TaskScheduler;
+	m_scheduler->Initialize( settings.workerCount );
+
+	m_tasks = new SampleTask[m_maxTasks];
 	m_taskCount = 0;
 
 	m_threadCount = 1 + settings.workerCount;
@@ -91,7 +111,7 @@ Sample::Sample( Settings& settings )
 
 	m_worldId = b2CreateWorld( &worldDef );
 	m_textLine = 30;
-	m_textIncrement = 18;
+	m_textIncrement = 22;
 	m_mouseJointId = b2_nullJointId;
 
 	m_stepCount = 0;
@@ -110,6 +130,9 @@ Sample::~Sample()
 {
 	// By deleting the world, we delete the bomb, mouse joint, etc.
 	b2DestroyWorld( m_worldId );
+
+	delete m_scheduler;
+	delete[] m_tasks;
 }
 
 void Sample::DrawTitle( const char* string )
@@ -241,8 +264,11 @@ void Sample::Step( Settings& settings )
 			timeStep = 0.0f;
 		}
 
-		g_draw.DrawString( 5, m_textLine, "****PAUSED****" );
-		m_textLine += m_textIncrement;
+		if ( g_draw.m_showUI )
+		{
+			g_draw.DrawString( 5, m_textLine, "****PAUSED****" );
+			m_textLine += m_textIncrement;
+		}
 	}
 
 	g_draw.m_debugDraw.drawingBounds = g_camera.GetViewBounds();
@@ -488,24 +514,4 @@ int RegisterSample( const char* category, const char* name, SampleCreateFcn* fcn
 	}
 
 	return -1;
-}
-
-uint32_t g_seed = RAND_SEED;
-
-b2Polygon RandomPolygon( float extent )
-{
-	b2Vec2 points[b2_maxPolygonVertices];
-	int count = 3 + RandomInt() % 6;
-	for ( int i = 0; i < count; ++i )
-	{
-		points[i] = RandomVec2( -extent, extent );
-	}
-
-	b2Hull hull = b2ComputeHull( points, count );
-	if ( hull.count > 0 )
-	{
-		return b2MakePolygon( &hull, 0.0f );
-	}
-
-	return b2MakeSquare( extent );
 }

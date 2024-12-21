@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "draw.h"
+#include "random.h"
 #include "sample.h"
 #include "settings.h"
 
@@ -299,7 +300,7 @@ public:
 			b2BodyDef bodyDef = b2DefaultBodyDef();
 			bodyDef.type = b2_dynamicBody;
 			bodyDef.position = { -25.0f - i, 6.0f };
-			float speed = RandomFloat( 200.0f, 300.0f );
+			float speed = RandomFloatRange( 200.0f, 300.0f );
 			bodyDef.linearVelocity = { speed, 0.0f };
 			bodyDef.isBullet = true;
 
@@ -388,7 +389,6 @@ static int sampleVerticalStack = RegisterSample( "Stacking", "Vertical Stack", V
 class CircleStack : public Sample
 {
 public:
-
 	struct Event
 	{
 		int indexA, indexB;
@@ -464,8 +464,8 @@ public:
 			m_events.push_back( { indexA, indexB } );
 		}
 
-		int eventCount = m_events.size();
-		for (int i = 0; i < eventCount; ++i)
+		int eventCount = (int)m_events.size();
+		for ( int i = 0; i < eventCount; ++i )
 		{
 			g_draw.DrawString( 5, m_textLine, "%d, %d", m_events[i].indexA, m_events[i].indexB );
 			m_textLine += m_textIncrement;
@@ -500,13 +500,13 @@ public:
 			b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
 
 			b2ShapeDef shapeDef = b2DefaultShapeDef();
-			b2Polygon box = b2MakeOffsetBox( 100.0f, 1.0f, { 0.0f, -1.0f }, b2Rot_identity  );
+			b2Polygon box = b2MakeOffsetBox( 100.0f, 1.0f, { 0.0f, -1.0f }, b2Rot_identity );
 			b2CreatePolygonShape( groundId, &shapeDef, &box );
 
 			b2Segment segment = { { -14.0f, 4.0f }, { -8.0f, 4.0f } };
 			b2CreateSegmentShape( groundId, &shapeDef, &segment );
 
-			box = b2MakeOffsetBox( 3.0f, 0.5f, { 0.0f, 4.0f }, b2Rot_identity  );
+			box = b2MakeOffsetBox( 3.0f, 0.5f, { 0.0f, 4.0f }, b2Rot_identity );
 			b2CreatePolygonShape( groundId, &shapeDef, &box );
 
 			b2Capsule capsule = { { 8.5f, 4.0f }, { 13.5f, 4.0f }, 0.5f };
@@ -883,9 +883,9 @@ public:
 		float cardHeight = 0.2f;
 		float cardThickness = 0.001f;
 
-		float angle0 = 25.0f * b2_pi / 180.0f;
-		float angle1 = -25.0f * b2_pi / 180.0f;
-		float angle2 = 0.5f * b2_pi;
+		float angle0 = 25.0f * B2_PI / 180.0f;
+		float angle1 = -25.0f * B2_PI / 180.0f;
+		float angle2 = 0.5f * B2_PI;
 
 		b2Polygon cardBox = b2MakeBox( cardThickness, cardHeight );
 		bodyDef.type = b2_dynamicBody;

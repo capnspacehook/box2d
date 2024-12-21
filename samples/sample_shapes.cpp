@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "draw.h"
+#include "random.h"
 #include "sample.h"
 #include "settings.h"
 
@@ -1229,7 +1230,7 @@ public:
 				b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
 
 				b2Polygon poly = RandomPolygon( 0.5f );
-				poly.radius = RandomFloat( 0.05f, 0.25f );
+				poly.radius = RandomFloatRange( 0.05f, 0.25f );
 				b2CreatePolygonShape( bodyId, &shapeDef, &poly );
 
 				x += 1.0f;
@@ -1265,7 +1266,7 @@ public:
 			b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
 
 			b2ShapeDef shapeDef = b2DefaultShapeDef();
-			b2Polygon box = b2MakeOffsetBox( 1.0f, 1.0f, { 10.0f, -2.0f }, b2MakeRot( 0.5f * b2_pi ) );
+			b2Polygon box = b2MakeOffsetBox( 1.0f, 1.0f, { 10.0f, -2.0f }, b2MakeRot( 0.5f * B2_PI ) );
 			b2CreatePolygonShape( groundId, &shapeDef, &box );
 		}
 
@@ -1280,7 +1281,7 @@ public:
 		}
 
 		{
-			b2Polygon box = b2MakeOffsetBox( 0.75f, 0.5f, { 9.0f, 2.0f }, b2MakeRot( 0.5f * b2_pi ) );
+			b2Polygon box = b2MakeOffsetBox( 0.75f, 0.5f, { 9.0f, 2.0f }, b2MakeRot( 0.5f * B2_PI ) );
 			b2BodyDef bodyDef = b2DefaultBodyDef();
 			bodyDef.position = { 0.0f, 0.0f };
 			bodyDef.type = b2_dynamicBody;
@@ -1339,7 +1340,7 @@ public:
 		float r = 8.0f;
 		for ( float angle = 0.0f; angle < 360.0f; angle += 30.0f )
 		{
-			b2CosSin cosSin = b2ComputeCosSin( angle * b2_pi / 180.0f );
+			b2CosSin cosSin = b2ComputeCosSin( angle * B2_PI / 180.0f );
 			bodyDef.position = { r * cosSin.cosine, r * cosSin.sine };
 			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
 
@@ -1386,10 +1387,10 @@ public:
 	{
 		if ( settings.pause == false || settings.singleStep == true )
 		{
-			m_referenceAngle += settings.hertz > 0.0f ? 60.0f * b2_pi / 180.0f / settings.hertz : 0.0f;
+			m_referenceAngle += settings.hertz > 0.0f ? 60.0f * B2_PI / 180.0f / settings.hertz : 0.0f;
 			m_referenceAngle = b2UnwindAngle( m_referenceAngle );
 
-			int count = m_jointIds.size();
+			int count = (int)m_jointIds.size();
 			for ( int i = 0; i < count; ++i )
 			{
 				b2WeldJoint_SetReferenceAngle( m_jointIds[i], m_referenceAngle );
