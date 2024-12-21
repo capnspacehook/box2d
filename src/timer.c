@@ -76,7 +76,7 @@ void b2Yield()
 	SwitchToThread();
 }
 
-#elif defined( __linux__ ) || defined( __EMSCRIPTEN__ )
+#elif defined( LINUX_TIMER )
 
 #include <sched.h>
 #include <time.h>
@@ -134,7 +134,7 @@ void b2Yield()
 	sched_yield();
 }
 
-#elif defined( __APPLE__ )
+#elif defined( APPLE_TIMER )
 
 #include <mach/mach_time.h>
 #include <sched.h>

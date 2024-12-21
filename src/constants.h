@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 extern float b2_lengthUnitsPerMeter;
 
 // Used to detect bad values. Positions greater than about 16km will have precision
@@ -22,7 +24,7 @@ extern float b2_lengthUnitsPerMeter;
 #define B2_LINEAR_SLOP ( 0.005f * b2_lengthUnitsPerMeter )
 
 // Maximum number of simultaneous worlds that can be allocated
-#define B2_MAX_WORLDS 128
+#define B2_MAX_WORLDS UINT16_MAX - 1
 
 // The maximum rotation of a body per time step. This limit is very large and is used
 // to prevent numerical problems. You shouldn't need to adjust this.
