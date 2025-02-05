@@ -32,16 +32,17 @@ public:
 
 		float groundWidth = 66.0f * extent;
 		b2ShapeDef shapeDef = b2DefaultShapeDef();
-		shapeDef.friction = 0.5f;
+		//shapeDef.friction = 0.5f;
 
 		b2Segment segment = { { -0.5f * 2.0f * groundWidth, 0.0f }, { 0.5f * 2.0f * groundWidth, 0.0f } };
 		b2CreateSegmentShape( groundId, &shapeDef, &segment );
 		bodyDef.type = b2_dynamicBody;
 
 		b2Polygon box = b2MakeBox( extent, extent );
-		bodyDef.position = { 0.0f, 4.0f };
-		b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
-		b2CreatePolygonShape( bodyId, &shapeDef, &box );
+		bodyDef.position = { 0.0f, 1.0f };
+		bodyDef.linearVelocity = { 5.0f, 0.0f };
+		m_bodyId = b2CreateBody( m_worldId, &bodyDef );
+		b2CreatePolygonShape( m_bodyId, &shapeDef, &box );
 	}
 
 	void Step( Settings& settings ) override
@@ -49,12 +50,17 @@ public:
 		Sample::Step( settings );
 
 		// g_draw.DrawCircle({0.0f, 2.0f}, 1.0f, b2_colorWhite);
+
+		b2Vec2 position = b2Body_GetPosition( m_bodyId );
+		DrawTextLine( "(x, y) = (%.2g, %.2g)", position.x, position.y );
 	}
 
 	static Sample* Create( Settings& settings )
 	{
 		return new SingleBox( settings );
 	}
+
+	b2BodyId m_bodyId;
 };
 
 static int sampleSingleBox = RegisterSample( "Stacking", "Single Box", SingleBox::Create );
@@ -201,7 +207,7 @@ public:
 			}
 		}
 
-		b2Circle circle = { 0 };
+		b2Circle circle = { };
 		circle.radius = 0.5f;
 
 		b2Polygon box = b2MakeBox( 0.5f, 0.5f );
@@ -420,28 +426,31 @@ public:
 		b2World_SetGravity( m_worldId, { 0.0f, -20.0f } );
 		b2World_SetContactTuning( m_worldId, 0.25f * 360.0f, 10.0f, 3.0f );
 
-		b2Circle circle = {};
-		circle.radius = 0.25f;
-
-		b2ShapeDef shapeDef = b2DefaultShapeDef();
-		shapeDef.enableHitEvents = true;
-
 		b2BodyDef bodyDef = b2DefaultBodyDef();
 		bodyDef.type = b2_dynamicBody;
 
-		float y = 0.5f;
+		b2Circle circle = {};
+		circle.radius = 0.5f;
 
-		for ( int i = 0; i < 8; ++i )
+		b2ShapeDef shapeDef = b2DefaultShapeDef();
+		shapeDef.enableHitEvents = true;
+		//shapeDef.rollingResistance = 0.2f;
+		shapeDef.friction = 0.0f;
+
+		float y = 0.75f;
+
+		for ( int i = 0; i < 2; ++i )
 		{
 			bodyDef.position.y = y;
 
 			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
 
 			shapeDef.userData = reinterpret_cast<void*>( intptr_t( shapeIndex ) );
+			shapeDef.density = 1.0f + 4.0f * i;
 			shapeIndex += 1;
 			b2CreateCircleShape( bodyId, &shapeDef, &circle );
 
-			y += 2.0f;
+			y += 1.25f;
 		}
 	}
 
@@ -481,6 +490,65 @@ public:
 };
 
 static int sampleCircleStack = RegisterSample( "Stacking", "Circle Stack", CircleStack::Create );
+
+// A simple circle stack that also shows how to collect hit events
+class CapsuleStack : public Sample
+{
+public:
+	struct Event
+	{
+		int indexA, indexB;
+	};
+
+	explicit CapsuleStack( Settings& settings )
+		: Sample( settings )
+	{
+		if ( settings.restart == false )
+		{
+			g_camera.m_center = { 0.0f, 5.0f };
+			g_camera.m_zoom = 6.0f;
+		}
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			bodyDef.position = { 0.0f, -1.0f };
+			b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			b2Polygon polygon = b2MakeBox( 10.0f, 1.0f );
+			b2CreatePolygonShape( groundId, &shapeDef, &polygon );
+		}
+
+		b2BodyDef bodyDef = b2DefaultBodyDef();
+		bodyDef.type = b2_dynamicBody;
+
+		b2Capsule capsule = { { -5.0f, 0.0f }, { 5.0f, 0.0f }, 0.5f };
+
+		b2ShapeDef shapeDef = b2DefaultShapeDef();
+		// shapeDef.rollingResistance = 0.2f;
+		shapeDef.friction = 0.0f;
+
+		float y = 0.5f;
+
+		for ( int i = 0; i < 1; ++i )
+		{
+			bodyDef.position.y = y;
+			bodyDef.linearVelocity = { 0.0f, -10.0f };
+			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2CreateCapsuleShape( bodyId, &shapeDef, &capsule );
+
+			y += 1.25f;
+		}
+	}
+
+	static Sample* Create( Settings& settings )
+	{
+		return new CapsuleStack( settings );
+	}
+};
+
+static int sampleCapsuleStack = RegisterSample( "Stacking", "Capsule Stack", CapsuleStack::Create );
 
 class Cliff : public Sample
 {
