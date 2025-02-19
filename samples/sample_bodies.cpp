@@ -183,7 +183,7 @@ public:
 		}
 	}
 
-	void UpdateUI() override
+	void UpdateGui() override
 	{
 		float height = 140.0f;
 		ImGui::SetNextWindowPos( ImVec2( 10.0f, g_camera.m_height - height - 50.0f ), ImGuiCond_Once );
@@ -534,7 +534,7 @@ public:
 		m_explosionMagnitude = 8.0f;
 	}
 
-	void UpdateUI() override
+	void UpdateGui() override
 	{
 		float height = 120.0f;
 		ImGui::SetNextWindowPos( ImVec2( 10.0f, g_camera.m_height - height - 50.0f ), ImGuiCond_Once );
@@ -612,6 +612,7 @@ public:
 
 			b2Segment segment = { { -20.0f, 0.0f }, { 20.0f, 0.0f } };
 			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			shapeDef.enableSensorEvents = true;
 			m_groundShapeId = b2CreateSegmentShape( groundId, &shapeDef, &segment );
 		}
 
@@ -630,6 +631,7 @@ public:
 			b2CreateCapsuleShape( bodyId, &shapeDef, &capsule );
 
 			shapeDef.isSensor = true;
+			shapeDef.enableSensorEvents = true;
 			capsule.radius = 1.0f;
 			m_sensorIds[i] = b2CreateCapsuleShape( bodyId, &shapeDef, &capsule );
 			m_sensorTouching[i] = false;
@@ -700,7 +702,7 @@ public:
 		}
 	}
 
-	void UpdateUI() override
+	void UpdateGui() override
 	{
 		float height = 100.0f;
 		ImGui::SetNextWindowPos( ImVec2( 10.0f, g_camera.m_height - height - 50.0f ), ImGuiCond_Once );

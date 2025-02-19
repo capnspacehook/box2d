@@ -1,8 +1,13 @@
 // SPDX-FileCopyrightText: 2023 Erin Catto
 // SPDX-License-Identifier: MIT
 
+#if defined( _MSC_VER )
+#ifndef _CRT_SECURE_NO_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
+#endif
 #define _CRTDBG_MAP_ALLOC
+#endif
+
 #define IMGUI_DISABLE_OBSOLETE_FUNCTIONS 1
 
 #include "TaskScheduler.h"
@@ -23,7 +28,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -33,7 +37,7 @@
 #define FrameMark
 #endif
 
-#if defined( _WIN32 ) && 0
+#if defined( _MSC_VER ) && 0
 #include <crtdbg.h>
 
 static int MyAllocHook( int allocType, void* userData, size_t size, int blockType, long requestNumber,
@@ -71,7 +75,7 @@ void* AllocFcn( uint32_t size, int32_t alignment )
 	size_t sizeAligned = ( ( size - 1 ) | ( alignment - 1 ) ) + 1;
 	assert( ( sizeAligned & ( alignment - 1 ) ) == 0 );
 
-#if defined( _WIN64 ) || defined( _WIN32 )
+#if defined( _MSC_VER )
 	void* ptr = _aligned_malloc( sizeAligned, alignment );
 #else
 	void* ptr = aligned_alloc( alignment, sizeAligned );
@@ -82,7 +86,7 @@ void* AllocFcn( uint32_t size, int32_t alignment )
 
 void FreeFcn( void* mem )
 {
-#if defined( _WIN64 ) || defined( _WIN32 )
+#if defined( _MSC_VER )
 	_aligned_free( mem );
 #else
 	free( mem );
@@ -418,14 +422,16 @@ static void UpdateUI()
 				ImGui::Checkbox( "Shapes", &s_settings.drawShapes );
 				ImGui::Checkbox( "Joints", &s_settings.drawJoints );
 				ImGui::Checkbox( "Joint Extras", &s_settings.drawJointExtras );
-				ImGui::Checkbox( "AABBs", &s_settings.drawAABBs );
+				ImGui::Checkbox( "Bounds", &s_settings.drawBounds );
 				ImGui::Checkbox( "Contact Points", &s_settings.drawContactPoints );
 				ImGui::Checkbox( "Contact Normals", &s_settings.drawContactNormals );
 				ImGui::Checkbox( "Contact Impulses", &s_settings.drawContactImpulses );
+				ImGui::Checkbox( "Contact Features", &s_settings.drawContactFeatures );
 				ImGui::Checkbox( "Friction Impulses", &s_settings.drawFrictionImpulses );
-				ImGui::Checkbox( "Center of Masses", &s_settings.drawMass );
+				ImGui::Checkbox( "Mass", &s_settings.drawMass );
 				ImGui::Checkbox( "Body Names", &s_settings.drawBodyNames );
 				ImGui::Checkbox( "Graph Colors", &s_settings.drawGraphColors );
+				ImGui::Checkbox( "Islands", &s_settings.drawIslands );
 				ImGui::Checkbox( "Counters", &s_settings.drawCounters );
 				ImGui::Checkbox( "Profile", &s_settings.drawProfile );
 
@@ -519,13 +525,13 @@ static void UpdateUI()
 
 		ImGui::End();
 
-		s_sample->UpdateUI();
+		s_sample->UpdateGui();
 	}
 }
 
 int main( int, char** )
 {
-#if defined( _WIN32 )
+#if defined( _MSC_VER )
 	// Enable memory-leak reports
 	_CrtSetReportMode( _CRT_WARN, _CRTDBG_MODE_DEBUG | _CRTDBG_MODE_FILE );
 	_CrtSetReportFile( _CRT_WARN, _CRTDBG_FILE_STDOUT );
@@ -665,7 +671,7 @@ int main( int, char** )
 
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-		//g_draw.DrawBackground();
+		// g_draw.DrawBackground();
 
 		double cursorPosX = 0, cursorPosY = 0;
 		glfwGetCursorPos( g_mainWindow, &cursorPosX, &cursorPosY );
@@ -772,7 +778,7 @@ int main( int, char** )
 
 	s_settings.Save();
 
-#if defined( _WIN32 )
+#if defined( _MSC_VER )
 	_CrtDumpMemoryLeaks();
 #endif
 

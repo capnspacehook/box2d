@@ -32,6 +32,7 @@
 #include <string.h>
 
 _Static_assert( B2_MAX_WORLDS > 0, "must be 1 or more" );
+_Static_assert( B2_MAX_WORLDS < UINT16_MAX, "B3_MAX_WORLDS limit exceeded" );
 b2World b2_worlds[B2_MAX_WORLDS];
 
 B2_ARRAY_SOURCE( b2BodyMoveEvent, b2BodyMoveEvent );
@@ -128,7 +129,7 @@ b2WorldId b2CreateWorld( const b2WorldDef* def )
 	world->generation = generation;
 	world->inUse = true;
 
-	world->stackAllocator = b2CreateArenaAllocator( 2048 );
+	world->arena = b2CreateArenaAllocator( 2048 );
 	b2CreateBroadPhase( &world->broadPhase );
 	b2CreateGraph( &world->constraintGraph, 16 );
 
@@ -191,7 +192,7 @@ b2WorldId b2CreateWorld( const b2WorldDef* def )
 	world->hitEventThreshold = def->hitEventThreshold;
 	world->restitutionThreshold = def->restitutionThreshold;
 	world->maxLinearSpeed = def->maximumLinearSpeed;
-	world->contactMaxPushSpeed = def->contactPushMaxSpeed;
+	world->maxContactPushSpeed = def->maxContactPushSpeed;
 	world->contactHertz = def->contactHertz;
 	world->contactDampingRatio = def->contactDampingRatio;
 	world->jointHertz = def->jointHertz;
@@ -256,6 +257,7 @@ b2WorldId b2CreateWorld( const b2WorldDef* def )
 	world->debugBodySet = b2CreateBitSet( 256 );
 	world->debugJointSet = b2CreateBitSet( 256 );
 	world->debugContactSet = b2CreateBitSet( 256 );
+	world->debugIslandSet = b2CreateBitSet( 256 );
 
 	// add one to worldId so that 0 represents a null b2WorldId
 	return ( b2WorldId ){ (uint16_t)( worldId + 1 ), world->generation };
@@ -268,6 +270,7 @@ void b2DestroyWorld( b2WorldId worldId )
 	b2DestroyBitSet( &world->debugBodySet );
 	b2DestroyBitSet( &world->debugJointSet );
 	b2DestroyBitSet( &world->debugContactSet );
+	b2DestroyBitSet( &world->debugIslandSet );
 
 	for ( int i = 0; i < world->workerCount; ++i )
 	{
@@ -345,7 +348,7 @@ void b2DestroyWorld( b2WorldId worldId )
 	b2DestroyIdPool( &world->islandIdPool );
 	b2DestroyIdPool( &world->solverSetIdPool );
 
-	b2DestroyArenaAllocator( &world->stackAllocator );
+	b2DestroyArenaAllocator( &world->arena );
 
 	// Wipe world but preserve generation
 	uint16_t generation = world->generation;
@@ -368,9 +371,9 @@ static void b2CollideTask( int startIndex, int endIndex, uint32_t threadIndex, v
 
 	B2_ASSERT( startIndex < endIndex );
 
-	for ( int i = startIndex; i < endIndex; ++i )
+	for ( int contactIndex = startIndex; contactIndex < endIndex; ++contactIndex )
 	{
-		b2ContactSim* contactSim = contactSims[i];
+		b2ContactSim* contactSim = contactSims[contactIndex];
 
 		int contactId = contactSim->contactId;
 
@@ -425,6 +428,19 @@ static void b2CollideTask( int startIndex, int endIndex, uint32_t threadIndex, v
 				contactSim->simFlags |= b2_simStoppedTouching;
 				b2SetBit( &taskContext->contactStateBitSet, contactId );
 			}
+
+			// To make this work, the time of impact code needs to adjust the target
+			// distance based on the number of TOI events for a body.
+			// if (touching && bodySimB->isFast)
+			//{
+			//	b2Manifold* manifold = &contactSim->manifold;
+			//	int pointCount = manifold->pointCount;
+			//	for (int i = 0; i < pointCount; ++i)
+			//	{
+			//		// trick the solver into pushing the fast shapes apart
+			//		manifold->points[i].separation -= 0.25f * B2_SPECULATIVE_DISTANCE;
+			//	}
+			//}
 		}
 	}
 
@@ -505,7 +521,7 @@ static void b2Collide( b2StepContext* context )
 	}
 
 	b2ContactSim** contactSims =
-		b2AllocateArenaItem( &world->stackAllocator, contactCount * sizeof( b2ContactSim* ), "contacts" );
+		b2AllocateArenaItem( &world->arena, contactCount * sizeof( b2ContactSim* ), "contacts" );
 
 	int contactIndex = 0;
 	for ( int i = 0; i < B2_GRAPH_COLOR_COUNT; ++i )
@@ -549,7 +565,7 @@ static void b2Collide( b2StepContext* context )
 		world->finishTaskFcn( userCollideTask, world->userTaskContext );
 	}
 
-	b2FreeArenaItem( &world->stackAllocator, contactSims );
+	b2FreeArenaItem( &world->arena, contactSims );
 	context->contacts = NULL;
 	contactSims = NULL;
 
@@ -782,10 +798,10 @@ void b2World_Step( b2WorldId worldId, float timeStep, int subStepCount )
 
 	world->profile.step = b2GetMilliseconds( stepTicks );
 
-	B2_ASSERT( b2GetArenaAllocation( &world->stackAllocator ) == 0 );
+	B2_ASSERT( b2GetArenaAllocation( &world->arena ) == 0 );
 
 	// Ensure stack is large enough
-	b2GrowArena( &world->stackAllocator );
+	b2GrowArena( &world->arena );
 
 	// Make sure all tasks that were started were also finished
 	B2_ASSERT( world->activeTaskCount == 0 );
@@ -927,7 +943,7 @@ static bool DrawQueryCallback( int proxyId, int shapeId, void* context )
 		b2DrawShape( draw, shape, bodySim->transform, color );
 	}
 
-	if ( draw->drawAABBs )
+	if ( draw->drawBounds )
 	{
 		b2AABB aabb = shape->fatAABB;
 
@@ -1112,6 +1128,12 @@ static void b2DrawWithBounds( b2World* world, b2DebugDraw* draw )
 								draw->DrawStringFcn( p1, buffer, b2_colorWhite, draw->context );
 							}
 
+							if ( draw->drawContactFeatures )
+							{
+								snprintf( buffer, B2_ARRAY_COUNT( buffer ), "%d", point->id );
+								draw->DrawStringFcn( point->point, buffer, b2_colorOrange, draw->context );
+							}
+
 							if ( draw->drawFrictionImpulses )
 							{
 								b2Vec2 tangent = b2RightPerp( normal );
@@ -1245,7 +1267,7 @@ void b2World_Draw( b2WorldId worldId, b2DebugDraw* draw )
 		}
 	}
 
-	if ( draw->drawAABBs )
+	if ( draw->drawBounds )
 	{
 		b2HexColor color = b2_colorGold;
 
@@ -1404,6 +1426,12 @@ void b2World_Draw( b2WorldId worldId, b2DebugDraw* draw )
 						draw->DrawStringFcn( p1, buffer, b2_colorWhite, draw->context );
 					}
 
+					if ( draw->drawContactFeatures )
+					{
+						snprintf( buffer, B2_ARRAY_COUNT( buffer ), "%d", point->id );
+						draw->DrawStringFcn( point->point, buffer, b2_colorOrange, draw->context );
+					}
+
 					if ( draw->drawFrictionImpulses )
 					{
 						b2Vec2 tangent = b2RightPerp( normal );
@@ -1414,6 +1442,53 @@ void b2World_Draw( b2WorldId worldId, b2DebugDraw* draw )
 						draw->DrawStringFcn( p1, buffer, b2_colorWhite, draw->context );
 					}
 				}
+			}
+		}
+	}
+
+	if ( draw->drawIslands )
+	{
+		int count = world->islands.count;
+		for ( int i = 0; i < count; ++i )
+		{
+			b2Island* island = world->islands.data + i;
+			if ( island->setIndex == B2_NULL_INDEX )
+			{
+				continue;
+			}
+
+			int shapeCount = 0;
+			b2AABB aabb = {
+				.lowerBound = { FLT_MAX, FLT_MAX },
+				.upperBound = { -FLT_MAX, -FLT_MAX },
+			};
+
+			island->bodyCount;
+
+			int bodyId = island->headBody;
+			while (bodyId != B2_NULL_INDEX)
+			{
+				b2Body* body = b2BodyArray_Get( &world->bodies, bodyId );
+				int shapeId = body->headShapeId;
+				while (shapeId != B2_NULL_INDEX)
+				{
+					b2Shape* shape = b2ShapeArray_Get( &world->shapes, shapeId );
+					aabb = b2AABB_Union( aabb, shape->fatAABB );
+					shapeCount += 1;
+					shapeId = shape->nextShapeId;
+				}
+
+				bodyId = body->islandNext;
+			}
+
+			if (shapeCount > 0)
+			{
+				b2Vec2 vs[4] = { { aabb.lowerBound.x, aabb.lowerBound.y },
+								 { aabb.upperBound.x, aabb.lowerBound.y },
+								 { aabb.upperBound.x, aabb.upperBound.y },
+								 { aabb.lowerBound.x, aabb.upperBound.y } };
+
+				draw->DrawPolygonFcn( vs, 4, b2_colorOrangeRed, draw->context );
 			}
 		}
 	}
@@ -1764,7 +1839,7 @@ void b2World_SetContactTuning( b2WorldId worldId, float hertz, float dampingRati
 
 	world->contactHertz = b2ClampFloat( hertz, 0.0f, FLT_MAX );
 	world->contactDampingRatio = b2ClampFloat( dampingRatio, 0.0f, FLT_MAX );
-	world->contactMaxPushSpeed = b2ClampFloat( pushSpeed, 0.0f, FLT_MAX );
+	world->maxContactPushSpeed = b2ClampFloat( pushSpeed, 0.0f, FLT_MAX );
 }
 
 void b2World_SetJointTuning( b2WorldId worldId, float hertz, float dampingRatio )
@@ -1823,7 +1898,7 @@ b2Counters b2World_GetCounters( b2WorldId worldId )
 	b2DynamicTree* kinematicTree = world->broadPhase.trees + b2_kinematicBody;
 	s.treeHeight = b2MaxInt( b2DynamicTree_GetHeight( dynamicTree ), b2DynamicTree_GetHeight( kinematicTree ) );
 
-	s.stackUsed = b2GetMaxArenaAllocation( &world->stackAllocator );
+	s.stackUsed = b2GetMaxArenaAllocation( &world->arena );
 	s.byteCount = b2GetByteCount();
 	s.taskCount = world->taskCount;
 
@@ -1975,7 +2050,7 @@ void b2World_DumpMemoryStats( b2WorldId worldId )
 	fprintf( file, "\n" );
 
 	// stack allocator
-	fprintf( file, "stack allocator: %d\n\n", world->stackAllocator.capacity );
+	fprintf( file, "stack allocator: %d\n\n", world->arena.capacity );
 
 	// chain shapes
 	// todo
@@ -2073,14 +2148,15 @@ static bool TreeOverlapCallback( int proxyId, int shapeId, void* context )
 	b2DistanceInput input;
 	input.proxyA = worldContext->proxy;
 	input.proxyB = b2MakeShapeDistanceProxy( shape );
-	input.transformA = worldContext->transform;
-	input.transformB = transform;
+	input.transformA = b2Transform_identity;
+	input.transformB = b2InvMulTransforms( worldContext->transform, transform );
 	input.useRadii = true;
 
 	b2SimplexCache cache = { 0 };
 	b2DistanceOutput output = b2ShapeDistance( &cache, &input, NULL, 0 );
 
-	if ( output.distance > 0.0f )
+	float tolerance = 0.1f * B2_LINEAR_SLOP;
+	if ( output.distance > tolerance )
 	{
 		return true;
 	}

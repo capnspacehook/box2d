@@ -179,6 +179,8 @@ public:
 
 static int sampleFallingHinges = RegisterSample( "Determinism", "Falling Hinges", FallingHinges::Create );
 
+#if 0
+
 #include <stdlib.h>
 
 #define WALL_THICKNESS 4.0f
@@ -473,7 +475,7 @@ void createProjectile( b2WorldId worldID, droneEntity* drone, const b2Vec2 normA
 	b2Shape_SetUserData( projectile->shapeID, ent );
 }
 
-void droneShoot( b2WorldId worldID, droneEntity* drone, const b2Vec2 aim )
+static void droneShoot( b2WorldId worldID, droneEntity* drone, const b2Vec2 aim )
 {
 	if ( drone->weaponCooldown != 0.0f )
 	{
@@ -492,48 +494,6 @@ void droneShoot( b2WorldId worldID, droneEntity* drone, const b2Vec2 aim )
 
 	createProjectile( worldID, drone, normAim );
 }
-
-#if 0
-int main( void )
-{
-	b2WorldDef worldDef = b2DefaultWorldDef();
-	worldDef.gravity = ( b2Vec2 ){ .x = 0.0f, .y = 0.0f };
-	b2WorldId worldID = b2CreateWorld( &worldDef );
-
-	setupMap( worldID );
-	droneEntity* drone = createDrone( worldID );
-
-	while ( true )
-	{
-		float aimX = tanhf( rand() / (float)RAND_MAX );
-		float aimY = tanhf( rand() / (float)RAND_MAX );
-
-		droneShoot( worldID, drone, ( b2Vec2 ){ .x = aimX, .y = aimY } );
-
-		b2World_Step( worldID, 1.0f / 10.0f, 1 );
-
-		b2BodyEvents events = b2World_GetBodyEvents( worldID );
-		for ( int i = 0; i < events.moveCount; i++ )
-		{
-			const b2BodyMoveEvent* event = events.moveEvents + i;
-			assert( b2Body_IsValid( event->bodyId ) );
-			entity* ent = (entity*)event->userData;
-			if ( ent == NULL )
-			{
-				continue;
-			}
-
-			const b2Vec2 pos = event->transform.p;
-			// check if the body is beyond the outside bounds of map
-			if ( pos.x < -48.0f || pos.x > 48.0f || pos.y < -48.0f || pos.y > 48.0f )
-			{
-				printf( "body is outside of wall bounds: (%f, %f)\n", pos.x, pos.y );
-				exit( 1 );
-			}
-		}
-	}
-}
-#endif
 
 class BulletBug : public Sample
 {
@@ -613,3 +573,71 @@ public:
 };
 
 static int sampleBulletBug = RegisterSample( "Bugs", "Bullet Bug", BulletBug::Create );
+
+class OverlapBug : public Sample
+{
+public:
+	explicit OverlapBug( Settings& settings )
+		: Sample( settings )
+	{
+		if ( settings.restart == false )
+		{
+			g_camera.m_center = { 0.0f, 2.5f };
+			g_camera.m_zoom = 3.5f;
+		}
+
+		float boxSize = 0.5f;
+		b2BodyDef body_def = b2DefaultBodyDef();
+		body_def.type = b2_staticBody;
+		body_def.position = { m_x, m_y };
+		b2BodyId body_id = b2CreateBody( m_worldId, &body_def );
+		b2Polygon polygon = b2MakeSquare( boxSize );
+		b2ShapeDef shape_def = b2DefaultShapeDef();
+		b2CreatePolygonShape( body_id, &shape_def, &polygon );
+	}
+
+	static bool Callback( b2ShapeId id, void* context )
+	{
+		OverlapBug* self = static_cast<OverlapBug*>( context );
+		self->m_overlap = true;
+		return false;
+	}
+
+	void Step( Settings& settings ) override
+	{
+		Sample::Step( settings );
+
+		float testSize = 0.4f;
+		b2Polygon test_polygon = b2MakeSquare( testSize );
+		b2Transform tfm = { { m_x, m_y }, { 1.0f, 0.0f } };
+		b2World_OverlapPolygon( m_worldId, &test_polygon, tfm, b2DefaultQueryFilter(), OverlapBug::Callback, this );
+
+		b2Vec2 vertices[4];
+		vertices[0] = b2TransformPoint(tfm, test_polygon.vertices[0]);
+		vertices[1] = b2TransformPoint(tfm, test_polygon.vertices[1]);
+		vertices[2] = b2TransformPoint(tfm, test_polygon.vertices[2]);
+		vertices[3] = b2TransformPoint(tfm, test_polygon.vertices[3]);
+		g_draw.DrawPolygon(vertices, 4, b2_colorOrange);
+
+		if ( m_overlap )
+		{
+			DrawTextLine( "overlap" );
+		}
+		else
+		{
+			DrawTextLine( "no overlap" );
+		}
+	}
+
+	static Sample* Create( Settings& settings )
+	{
+		return new OverlapBug( settings );
+	}
+
+	float m_x = 3.0f;
+	float m_y = 5.0f;
+	bool m_overlap = false;
+};
+
+static int sampleSingleBox = RegisterSample( "Bugs", "Overlap", OverlapBug::Create );
+#endif
