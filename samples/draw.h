@@ -19,8 +19,8 @@ struct Camera
 
 	b2Vec2 m_center;
 	float m_zoom;
-	int32_t m_width;
-	int32_t m_height;
+	int m_width;
+	int m_height;
 };
 
 // This class implements Box2D debug drawing callbacks
@@ -60,7 +60,6 @@ public:
 	struct GLBackground* m_background;
 	struct GLPoints* m_points;
 	struct GLLines* m_lines;
-	struct GLTriangles* m_triangles;
 	struct GLCircles* m_circles;
 	struct GLSolidCircles* m_solidCircles;
 	struct GLSolidCapsules* m_solidCapsules;

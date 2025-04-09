@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include <box2d/collision.h>
-#include <box2d/math_functions.h>
+#include "box2d/collision.h"
+#include "box2d/math_functions.h"
 
 #define RAND_LIMIT 32767
 #define RAND_SEED 12345
@@ -68,4 +68,11 @@ B2_INLINE b2Vec2 RandomVec2( float lo, float hi )
 	v.x = RandomFloatRange( lo, hi );
 	v.y = RandomFloatRange( lo, hi );
 	return v;
+}
+
+// Random rotation with angle in range [-pi, pi]
+B2_INLINE b2Rot RandomRot( void )
+{
+	float angle = RandomFloatRange( -B2_PI, B2_PI );
+	return b2MakeRot( angle );
 }

@@ -47,6 +47,7 @@ endif()
 
 # Deterministic math
 # https://box2d.org/posts/2024/08/determinism/
+# todo make this apply to ClangCL
 if (MINGW OR APPLE OR UNIX)
 	add_compile_options(-ffp-contract=off)
 endif()
@@ -57,16 +58,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
 	cmake_dependent_option(BOX2D_AVX2 "Enable AVX2" OFF "BOX2D_ENABLE_SIMD" OFF)
 endif()
 
-if(PROJECT_IS_TOP_LEVEL)
-	# Needed for samples.exe to find box2d.dll
-	# set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
-endif()
-
-# C++17 needed for imgui
-set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -82,6 +74,10 @@ if(PROJECT_IS_TOP_LEVEL)
 	option(BOX2D_VALIDATE "Enable heavy validation" ON)
 	option(BOX2D_UNIT_TESTS "Build the Box2D unit tests" ON)
 
+	# Needed for samples.exe to find box2d.dll
+	# set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+
 	include(GNUInstallDirs)
 
 	install(
@@ -90,9 +86,6 @@ if(PROJECT_IS_TOP_LEVEL)
 	)
 
 	if(MSVC AND WIN32)
-		# Enable edit and continue only in debug due to perf hit in release
-		# add_link_options($<$<CONFIG:Debug>:/INCREMENTAL>)
-		# add_compile_options($<$<CONFIG:Debug>:/ZI>)
 		# add_compile_options(/fsanitize=address)
 		# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/GS- /Gy /O2 /Oi /Ot")
 		# set(CMAKE_CXX_FLAGS_RELEASE "/GS- /Gy /O2 /Oi /Ot")
@@ -102,7 +95,6 @@ if(PROJECT_IS_TOP_LEVEL)
 
 	# enkiTS is used by all the test apps, but not directly by the Box2D library
 	if(BOX2D_UNIT_TESTS OR BOX2D_SAMPLES OR BOX2D_BENCHMARKS)
-		SET(ENKITS_BUILD_EXAMPLES OFF CACHE BOOL "Build enkiTS examples")
 
 		# Emscripten pthread support for enkiTS
 		if(EMSCRIPTEN)
@@ -113,7 +105,8 @@ if(PROJECT_IS_TOP_LEVEL)
 			string(APPEND CMAKE_EXE_LINKER_FLAGS " ${EMSCRIPTEN_PTHREADS_LINKER_FLAGS}")
 		endif()
 
-		# Used in tests and samples
+		# Task system used in tests and samples
+		set(ENKITS_BUILD_EXAMPLES OFF CACHE BOOL "Build enkiTS examples")
 		FetchContent_Declare(
 			enkits
 			GIT_REPOSITORY https://github.com/dougbinks/enkiTS.git

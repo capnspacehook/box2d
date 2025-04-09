@@ -1,8 +1,11 @@
 set(BOX2D_SOURCE_FILES
 	aabb.c
 	aabb.h
+	arena_allocator.c
+	arena_allocator.h
 	array.c
 	array.h
+	atomic.h
 	bitset.c
 	bitset.h
 	body.c
@@ -34,16 +37,17 @@ set(BOX2D_SOURCE_FILES
 	math_functions.c
 	motor_joint.c
 	mouse_joint.c
+	mover.c
 	prismatic_joint.c
 	revolute_joint.c
+	sensor.c
+	sensor.h
 	shape.c
 	shape.h
 	solver.c
 	solver.h
 	solver_set.c
 	solver_set.h
-	stack_allocator.c
-	stack_allocator.h
 	table.c
 	table.h
 	timer.c
@@ -87,7 +91,7 @@ target_include_directories(box2d
 
 set(CMAKE_DEBUG_POSTFIX "d")
 
-# Box2D uses C17
+# Box2D uses C17 for _Static_assert and anonymous unions
 set_target_properties(box2d PROPERTIES
 	C_STANDARD 17
     C_STANDARD_REQUIRED YES
@@ -113,10 +117,12 @@ if (BOX2D_PROFILE)
 endif()
 
 if (BOX2D_VALIDATE)
+	message(STATUS "Box2D validation ON")	
 	target_compile_definitions(box2d PRIVATE BOX2D_VALIDATE)
 endif()
 
 if (BOX2D_ENABLE_SIMD)
+	message(STATUS "Box2D SIMD enabled")	
 	target_compile_definitions(box2d PRIVATE BOX2D_ENABLE_SIMD)
 endif()
 
@@ -133,9 +139,6 @@ if (MSVC)
 	# Enable asserts in release with debug info
 	target_compile_definitions(box2d PUBLIC "$<$<CONFIG:RELWITHDEBINFO>:B2_ENABLE_ASSERT>")
 
-	# Atomics are still considered experimental in Visual Studio 17.8
-	target_compile_options(box2d PRIVATE /experimental:c11atomics)
-
 	# All warnings
 	target_compile_options(box2d PRIVATE /W4)
 
@@ -143,6 +146,10 @@ if (MSVC)
 		message(STATUS "Box2D using AVX2")	
 		target_compile_definitions(box2d PRIVATE BOX2D_AVX2)
 		target_compile_options(box2d PRIVATE /arch:AVX2)
+	endif()
+
+	if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+		target_compile_options(box2d PRIVATE -Wmissing-prototypes)
 	endif()
 
 elseif (MINGW)
@@ -155,11 +162,15 @@ elseif (MINGW)
 	endif()
 elseif (APPLE)
 	message(STATUS "Box2D on Apple")
+	target_compile_options(box2d PRIVATE -Wmissing-prototypes)
 elseif (EMSCRIPTEN)
 	message(STATUS "Box2D on Emscripten")
-	target_compile_options(box2d PRIVATE -msimd128 -msse2)
+	if (BOX2D_ENABLE_SIMD)
+		target_compile_options(box2d PRIVATE -msimd128 -msse2)
+	endif()
 elseif (UNIX)
 	message(STATUS "Box2D using Unix")
+	target_compile_options(box2d PRIVATE -Wmissing-prototypes)
 	if ("${CMAKE_HOST_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
 		# raspberry pi
 		# -mfpu=neon
@@ -195,6 +206,11 @@ install(
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/box2d"
 )
 
+install(
+  FILES ${BOX2D_API_FILES}
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/box2d
+)
+
 include(CMakePackageConfigHelpers)
 
 write_basic_package_version_file(
@@ -206,4 +222,3 @@ install(
   FILES "${CMAKE_CURRENT_BINARY_DIR}/box2dConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/box2d"
 )
-

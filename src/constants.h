@@ -20,22 +20,28 @@ extern float b2_lengthUnitsPerMeter;
 
 // A small length used as a collision and constraint tolerance. Usually it is
 // chosen to be numerically significant, but visually insignificant. In meters.
+// Normally this is 0.5cm.
 // @warning modifying this can have a significant impact on stability
 #define B2_LINEAR_SLOP ( 0.005f * b2_lengthUnitsPerMeter )
 
 // Maximum number of simultaneous worlds that can be allocated
-#define B2_MAX_WORLDS UINT16_MAX - 1
+#ifndef B2_MAX_WORLDS
+#define B2_MAX_WORLDS 128
+#endif
 
 // The maximum rotation of a body per time step. This limit is very large and is used
 // to prevent numerical problems. You shouldn't need to adjust this.
 // @warning increasing this to 0.5f * b2_pi or greater will break continuous collision.
 #define B2_MAX_ROTATION ( 0.25f * B2_PI )
 
+// Box2D uses limited speculative collision. This reduces jitter.
+// Normally this is 2cm.
 // @warning modifying this can have a significant impact on performance and stability
 #define B2_SPECULATIVE_DISTANCE ( 4.0f * B2_LINEAR_SLOP )
 
 // This is used to fatten AABBs in the dynamic tree. This allows proxies
 // to move by a small amount without triggering a tree adjustment. This is in meters.
+// Normally this is 5cm.
 // @warning modifying this can have a significant impact on performance
 #define B2_AABB_MARGIN ( 0.05f * b2_lengthUnitsPerMeter )
 

@@ -14,6 +14,10 @@
 #include <imgui.h>
 #include <vector>
 
+#ifndef NDEBUG
+extern "C" int b2_toiHitCount;
+#endif
+
 class BounceHouse : public Sample
 {
 public:
@@ -93,8 +97,8 @@ public:
 
 		b2ShapeDef shapeDef = b2DefaultShapeDef();
 		shapeDef.density = 1.0f;
-		shapeDef.restitution = 1.2f;
-		shapeDef.friction = 0.3f;
+		shapeDef.material.restitution = 1.2f;
+		shapeDef.material.friction = 0.3f;
 		shapeDef.enableHitEvents = m_enableHitEvents;
 
 		if ( m_shapeType == e_circleShape )
@@ -115,7 +119,7 @@ public:
 		}
 	}
 
-	void UpdateUI() override
+	void UpdateGui() override
 	{
 		float height = 100.0f;
 		ImGui::SetNextWindowPos( ImVec2( 10.0f, g_camera.m_height - height - 50.0f ), ImGuiCond_Once );
@@ -191,10 +195,93 @@ public:
 
 static int sampleBounceHouse = RegisterSample( "Continuous", "Bounce House", BounceHouse::Create );
 
-class FastChain : public Sample
+class BounceHumans : public Sample
 {
 public:
-	explicit FastChain( Settings& settings )
+	explicit BounceHumans( Settings& settings )
+		: Sample( settings )
+	{
+		g_camera.m_center = { 0.0f, 0.0f };
+		g_camera.m_zoom = 12.0f;
+
+		b2BodyDef bodyDef = b2DefaultBodyDef();
+		b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
+
+		b2ShapeDef shapeDef = b2DefaultShapeDef();
+		shapeDef.material.restitution = 1.3f;
+		shapeDef.material.friction = 0.1f;
+
+		{
+			b2Segment segment = { { -10.0f, -10.0f }, { 10.0f, -10.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+		}
+
+		{
+			b2Segment segment = { { 10.0f, -10.0f }, { 10.0f, 10.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+		}
+
+		{
+			b2Segment segment = { { 10.0f, 10.0f }, { -10.0f, 10.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+		}
+
+		{
+			b2Segment segment = { { -10.0f, 10.0f }, { -10.0f, -10.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+		}
+
+		b2Circle circle = { { 0.0f, 0.0f }, 2.0f };
+		shapeDef.material.restitution = 2.0f;
+		b2CreateCircleShape( groundId, &shapeDef, &circle );
+	}
+
+	void Step( Settings& settings ) override
+	{
+		if ( m_humanCount < 5 && m_countDown <= 0.0f )
+		{
+			float jointFrictionTorque = 0.0f;
+			float jointHertz = 1.0f;
+			float jointDampingRatio = 0.1f;
+
+			CreateHuman( m_humans + m_humanCount, m_worldId, { 0.0f, 5.0f }, 1.0f, jointFrictionTorque, jointHertz,
+						 jointDampingRatio, 1, nullptr, true );
+			// Human_SetVelocity( m_humans + m_humanCount, { 10.0f - 5.0f * m_humanCount, -20.0f + 5.0f * m_humanCount } );
+
+			m_countDown = 2.0f;
+			m_humanCount += 1;
+		}
+
+		float timeStep = 1.0f / 60.0f;
+		b2CosSin cs1 = b2ComputeCosSin( 0.5f * m_time );
+		b2CosSin cs2 = b2ComputeCosSin( m_time );
+		float gravity = 10.0f;
+		b2Vec2 gravityVec = { gravity * cs1.sine, gravity * cs2.cosine };
+		g_draw.DrawSegment( b2Vec2_zero, b2Vec2{ 3.0f * cs1.sine, 3.0f * cs2.cosine }, b2_colorWhite );
+		m_time += timeStep;
+		m_countDown -= timeStep;
+		b2World_SetGravity( m_worldId, gravityVec );
+
+		Sample::Step( settings );
+	}
+
+	static Sample* Create( Settings& settings )
+	{
+		return new BounceHumans( settings );
+	}
+
+	Human m_humans[5] = {};
+	int m_humanCount = 0;
+	float m_countDown = 0.0f;
+	float m_time = 0.0f;
+};
+
+static int sampleBounceHumans = RegisterSample( "Continuous", "Bounce Humans", BounceHumans::Create );
+
+class ChainDrop : public Sample
+{
+public:
+	explicit ChainDrop( Settings& settings )
 		: Sample( settings )
 	{
 		if ( settings.restart == false )
@@ -202,6 +289,9 @@ public:
 			g_camera.m_center = { 0.0f, 0.0f };
 			g_camera.m_zoom = 25.0f * 0.35f;
 		}
+
+		// 
+		//b2World_SetContactTuning( m_worldId, 30.0f, 1.0f, 100.0f );
 
 		b2BodyDef bodyDef = b2DefaultBodyDef();
 		bodyDef.position = { 0.0f, -6.0f };
@@ -217,6 +307,8 @@ public:
 		b2CreateChain( groundId, &chainDef );
 
 		m_bodyId = b2_nullBodyId;
+		m_yOffset = -0.1f;
+		m_speed = -42.0f;
 
 		Launch();
 	}
@@ -230,23 +322,35 @@ public:
 
 		b2BodyDef bodyDef = b2DefaultBodyDef();
 		bodyDef.type = b2_dynamicBody;
-		bodyDef.linearVelocity = { 0.0f, -200.0f };
-		bodyDef.position = { 0.0f, 10.0f };
-		bodyDef.gravityScale = 1.0f;
+		bodyDef.linearVelocity = { 0.0f, m_speed };
+		bodyDef.position = { 0.0f, 10.0f + m_yOffset };
+		bodyDef.rotation = b2MakeRot( 0.5f * B2_PI );
+		bodyDef.fixedRotation = true;
 		m_bodyId = b2CreateBody( m_worldId, &bodyDef );
 
 		b2ShapeDef shapeDef = b2DefaultShapeDef();
+
 		b2Circle circle = { { 0.0f, 0.0f }, 0.5f };
-		b2CreateCircleShape( m_bodyId, &shapeDef, &circle );
+		m_shapeId = b2CreateCircleShape( m_bodyId, &shapeDef, &circle );
+
+		//b2Capsule capsule = { { -0.5f, 0.0f }, { 0.5f, 0.0 }, 0.25f };
+		//m_shapeId = b2CreateCapsuleShape( m_bodyId, &shapeDef, &capsule );
+
+		//float h = 0.5f;
+		//b2Polygon box = b2MakeBox( h, h );
+		//m_shapeId = b2CreatePolygonShape( m_bodyId, &shapeDef, &box );
 	}
 
-	void UpdateUI() override
+	void UpdateGui() override
 	{
-		float height = 70.0f;
+		float height = 140.0f;
 		ImGui::SetNextWindowPos( ImVec2( 10.0f, g_camera.m_height - height - 50.0f ), ImGuiCond_Once );
 		ImGui::SetNextWindowSize( ImVec2( 240.0f, height ) );
 
-		ImGui::Begin( "Fast Chain", nullptr, ImGuiWindowFlags_NoResize );
+		ImGui::Begin( "Chain Drop", nullptr, ImGuiWindowFlags_NoResize );
+
+		ImGui::SliderFloat( "Speed", &m_speed, -100.0f, 0.0f, "%.0f" );
+		ImGui::SliderFloat( "Y Offset", &m_yOffset, -1.0f, 1.0f, "%.1f" );
 
 		if ( ImGui::Button( "Launch" ) )
 		{
@@ -258,13 +362,166 @@ public:
 
 	static Sample* Create( Settings& settings )
 	{
-		return new FastChain( settings );
+		return new ChainDrop( settings );
 	}
 
 	b2BodyId m_bodyId;
+	b2ShapeId m_shapeId;
+	float m_yOffset;
+	float m_speed;
 };
 
-static int sampleFastChainHouse = RegisterSample( "Continuous", "Fast Chain", FastChain::Create );
+static int sampleChainDrop = RegisterSample( "Continuous", "Chain Drop", ChainDrop::Create );
+
+class ChainSlide : public Sample
+{
+public:
+	explicit ChainSlide( Settings& settings )
+		: Sample( settings )
+	{
+		if ( settings.restart == false )
+		{
+			g_camera.m_center = { 0.0f, 10.0f };
+			g_camera.m_zoom = 15.0f;
+		}
+
+#ifndef NDEBUG
+		b2_toiHitCount = 0;
+#endif
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
+
+			constexpr int count = 80;
+			b2Vec2 points[count];
+
+			float w = 2.0f;
+			float h = 1.0f;
+			float x = 20.0f, y = 0.0f;
+			for (int i = 0; i < 20; ++i)
+			{
+				points[i] = { x, y };
+				x -= w;
+			}
+
+			for (int i = 20; i < 40; ++i)
+			{
+				points[i] = { x, y };
+				y += h;
+			}
+
+			for (int i = 40; i < 60; ++i)
+			{
+				points[i] = { x, y };
+				x += w;
+			}
+
+			for (int i = 60; i < 80; ++i)
+			{
+				points[i] = { x, y };
+				y -= h;
+			}
+
+			b2ChainDef chainDef = b2DefaultChainDef();
+			chainDef.points = points;
+			chainDef.count = count;
+			chainDef.isLoop = true;
+
+			b2CreateChain( groundId, &chainDef );
+		}
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			bodyDef.type = b2_dynamicBody;
+			bodyDef.linearVelocity = { 100.0f, 0.0f };
+			bodyDef.position = { -19.5f, 0.0f + 0.5f };
+			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			shapeDef.material.friction = 0.0f;
+			b2Circle circle = { { 0.0f, 0.0f }, 0.5f };
+			b2CreateCircleShape( bodyId, &shapeDef, &circle );
+		}
+	}
+
+	void Step( Settings& settings ) override
+	{
+		Sample::Step( settings );
+
+#ifndef NDEBUG
+		g_draw.DrawString( 5, m_textLine, "toi hits = %d", b2_toiHitCount );
+		m_textLine += m_textIncrement;
+#endif
+	}
+
+	static Sample* Create( Settings& settings )
+	{
+		return new ChainSlide( settings );
+	}
+};
+
+static int sampleChainSlide = RegisterSample( "Continuous", "Chain Slide", ChainSlide::Create );
+
+class SegmentSlide : public Sample
+{
+public:
+	explicit SegmentSlide( Settings& settings )
+		: Sample( settings )
+	{
+		if ( settings.restart == false )
+		{
+			g_camera.m_center = { 0.0f, 10.0f };
+			g_camera.m_zoom = 15.0f;
+		}
+
+#ifndef NDEBUG
+		b2_toiHitCount = 0;
+#endif
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			b2Segment segment = { { -40.0f, 0.0f }, { 40.0f, 0.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+
+			segment = { { 40.0f, 0.0f }, { 40.0f, 10.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+		}
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			bodyDef.type = b2_dynamicBody;
+			bodyDef.linearVelocity = { 100.0f, 0.0f };
+			bodyDef.position = { -20.0f, 0.7f };
+			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			//shapeDef.friction = 0.0f;
+			b2Circle circle = { { 0.0f, 0.0f }, 0.5f };
+			b2CreateCircleShape( bodyId, &shapeDef, &circle );
+		}
+	}
+
+	void Step( Settings& settings ) override
+	{
+		Sample::Step( settings );
+
+#ifndef NDEBUG
+		g_draw.DrawString( 5, m_textLine, "toi hits = %d", b2_toiHitCount );
+		m_textLine += m_textIncrement;
+#endif
+	}
+
+	static Sample* Create( Settings& settings )
+	{
+		return new SegmentSlide( settings );
+	}
+};
+
+static int sampleSegmentSlide = RegisterSample( "Continuous", "Segment Slide", SegmentSlide::Create );
 
 class SkinnyBox : public Sample
 {
@@ -284,7 +541,7 @@ public:
 
 			b2Segment segment = { { -10.0f, 0.0f }, { 10.0f, 0.0f } };
 			b2ShapeDef shapeDef = b2DefaultShapeDef();
-			shapeDef.friction = 0.9f;
+			shapeDef.material.friction = 0.9f;
 			b2CreateSegmentShape( groundId, &shapeDef, &segment );
 
 			b2Polygon box = b2MakeOffsetBox( 0.1f, 1.0f, { 0.0f, 1.0f }, b2Rot_identity );
@@ -324,7 +581,7 @@ public:
 
 		b2ShapeDef shapeDef = b2DefaultShapeDef();
 		shapeDef.density = 1.0f;
-		shapeDef.friction = 0.9f;
+		shapeDef.material.friction = 0.9f;
 
 		m_bodyId = b2CreateBody( m_worldId, &bodyDef );
 
@@ -350,7 +607,7 @@ public:
 		}
 	}
 
-	void UpdateUI() override
+	void UpdateGui() override
 	{
 		float height = 110.0f;
 		ImGui::SetNextWindowPos( ImVec2( 10.0f, g_camera.m_height - height - 50.0f ), ImGuiCond_Once );
@@ -470,20 +727,24 @@ public:
 			points[18] = b2Add( points[17], { -2.0f * hx, 0.0f } );
 			points[19] = b2Add( points[18], { -2.0f * hx, 0.0f } );
 
+			b2SurfaceMaterial material = {};
+			material.friction = m_friction;
+
 			b2ChainDef chainDef = b2DefaultChainDef();
 			chainDef.points = points;
 			chainDef.count = 20;
 			chainDef.isLoop = true;
-			chainDef.friction = m_friction;
+			chainDef.materials = &material;
+			chainDef.materialCount = 1;
 
 			b2CreateChain( m_groundId, &chainDef );
 		}
 		else
 		{
 			b2ShapeDef shapeDef = b2DefaultShapeDef();
-			shapeDef.friction = m_friction;
+			shapeDef.material.friction = m_friction;
 
-			b2Hull hull = { 0 };
+			b2Hull hull = { };
 
 			if ( m_bevel > 0.0f )
 			{
@@ -595,7 +856,7 @@ public:
 
 		b2ShapeDef shapeDef = b2DefaultShapeDef();
 		shapeDef.density = 1.0f;
-		shapeDef.friction = m_friction;
+		shapeDef.material.friction = m_friction;
 
 		if ( m_shapeType == e_circleShape )
 		{
@@ -615,7 +876,7 @@ public:
 		}
 	}
 
-	void UpdateUI() override
+	void UpdateGui() override
 	{
 		float height = 140.0f;
 		ImGui::SetNextWindowPos( ImVec2( 10.0f, g_camera.m_height - height - 50.0f ), ImGuiCond_Once );
@@ -736,6 +997,50 @@ public:
 
 static int sampleSpeculativeFallback = RegisterSample( "Continuous", "Speculative Fallback", SpeculativeFallback::Create );
 
+class SpeculativeSliver : public Sample
+{
+public:
+	explicit SpeculativeSliver( Settings& settings )
+		: Sample( settings )
+	{
+		if ( settings.restart == false )
+		{
+			g_camera.m_center = { 0.0f, 1.75f };
+			g_camera.m_zoom = 2.5f;
+		}
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			b2Segment segment = { { -10.0f, 0.0f }, { 10.0f, 0.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+		}
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			bodyDef.type = b2_dynamicBody;
+			bodyDef.position = { 0.0f, 12.0f };
+			bodyDef.linearVelocity = { 0.0f, -100.0f };
+			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			b2Vec2 points[3] = { { -2.0f, 0.0f }, { -1.0f, 0.0f }, { 2.0f, 0.5f }};
+			b2Hull hull = b2ComputeHull( points, 3 );
+			b2Polygon poly = b2MakePolygon( &hull, 0.0f );
+			b2CreatePolygonShape( bodyId, &shapeDef, &poly );
+		}
+	}
+
+	static Sample* Create( Settings& settings )
+	{
+		return new SpeculativeSliver( settings );
+	}
+};
+
+static int sampleSpeculativeSliver = RegisterSample( "Continuous", "Speculative Sliver", SpeculativeSliver::Create );
+
 // This shows that while Box2D uses speculative collision, it does not lead to speculative ghost collisions at small distances
 class SpeculativeGhost : public Sample
 {
@@ -807,7 +1112,7 @@ public:
 			b2BodyId block4BodyId = b2CreateBody( m_worldId, &block4BodyDef );
 			b2Polygon block4Shape = b2MakeBox( 20.f / pixelsPerMeter, 10.f / pixelsPerMeter );
 			b2ShapeDef block4ShapeDef = b2DefaultShapeDef();
-			block4ShapeDef.friction = 0.f;
+			block4ShapeDef.material.friction = 0.f;
 			b2CreatePolygonShape( block4BodyId, &block4ShapeDef, &block4Shape );
 		}
 
@@ -822,7 +1127,7 @@ public:
 			//b2Polygon ballShape = b2MakeBox( 5.f / pixelsPerMeter, 5.f / pixelsPerMeter );
 			b2Polygon ballShape = b2MakeRoundedBox( 4.0f / pixelsPerMeter, 4.0f / pixelsPerMeter, 0.9f / pixelsPerMeter );
 			b2ShapeDef ballShapeDef = b2DefaultShapeDef();
-			ballShapeDef.friction = 0.f;
+			ballShapeDef.material.friction = 0.f;
 			//ballShapeDef.restitution = 1.f;
 			b2CreatePolygonShape( m_ballId, &ballShapeDef, &ballShape );
 			b2Body_SetLinearVelocity( m_ballId, { 0.f, -5.0f } );
@@ -878,7 +1183,7 @@ public:
 			b2BodyId block0BodyId = b2CreateBody( m_worldId, &block0BodyDef );
 			b2Polygon block0Shape = b2MakeBox( 50.f / pixelsPerMeter, 5.f / pixelsPerMeter );
 			b2ShapeDef block0ShapeDef = b2DefaultShapeDef();
-			block0ShapeDef.friction = 0.f;
+			block0ShapeDef.material.friction = 0.f;
 			b2CreatePolygonShape( block0BodyId, &block0ShapeDef, &block0Shape );
 		}
 
@@ -892,8 +1197,8 @@ public:
 			b2Circle ballShape = {};
 			ballShape.radius = 5.f / pixelsPerMeter;
 			b2ShapeDef ballShapeDef = b2DefaultShapeDef();
-			ballShapeDef.friction = 0.f;
-			ballShapeDef.restitution = 1.f;
+			ballShapeDef.material.friction = 0.f;
+			ballShapeDef.material.restitution = 1.f;
 			b2CreateCircleShape( m_ballId, &ballShapeDef, &ballShape );
 
 			b2Body_SetLinearVelocity( m_ballId, { 0.f, -2.9f } ); // Initial velocity
@@ -1377,7 +1682,7 @@ public:
 			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
 
 			b2ShapeDef shapeDef = b2DefaultShapeDef();
-			shapeDef.restitution = 1.5f;
+			shapeDef.material.restitution = 1.5f;
 
 			b2Circle circle = { { 0.0f, 0.0f }, 1.0f };
 			b2CreateCircleShape( bodyId, &shapeDef, &circle );
@@ -1429,3 +1734,51 @@ public:
 };
 
 static int samplePinball = RegisterSample( "Continuous", "Pinball", Pinball::Create );
+
+// This shows the importance of secondary collisions in continuous physics.
+// This also shows a difficult setup for the solver with an acute angle.
+class Wedge : public Sample
+{
+public:
+	explicit Wedge( Settings& settings )
+		: Sample( settings )
+	{
+		if ( settings.restart == false )
+		{
+			g_camera.m_center = { 0.0f, 5.5f };
+			g_camera.m_zoom = 6.0f;
+		}
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			b2BodyId groundId = b2CreateBody( m_worldId, &bodyDef );
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			b2Segment segment = { { -4.0f, 8.0f }, { 0.0f, 0.0f } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+			segment = { { 0.0f, 0.0f }, { 0.0f, 8.0 } };
+			b2CreateSegmentShape( groundId, &shapeDef, &segment );
+		}
+
+		{
+			b2BodyDef bodyDef = b2DefaultBodyDef();
+			bodyDef.type = b2_dynamicBody;
+			bodyDef.position = { -0.45f, 10.75f };
+			bodyDef.linearVelocity = { 0.0f, -200.0f };
+
+			b2BodyId bodyId = b2CreateBody( m_worldId, &bodyDef );
+
+			b2Circle circle = {};
+			circle.radius = 0.3f;
+			b2ShapeDef shapeDef = b2DefaultShapeDef();
+			shapeDef.material.friction = 0.2f;
+			b2CreateCircleShape( bodyId, &shapeDef, &circle );
+		}
+	}
+
+	static Sample* Create( Settings& settings )
+	{
+		return new Wedge( settings );
+	}
+};
+
+static int sampleWedge = RegisterSample( "Continuous", "Wedge", Wedge::Create );
