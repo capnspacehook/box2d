@@ -22,6 +22,10 @@ set_target_properties(test PROPERTIES
     C_EXTENSIONS NO
 )
 
+if (BOX2D_COMPILE_WARNING_AS_ERROR)
+	set_target_properties(test PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+endif()
+
 # Special access to Box2D internals for testing
 target_include_directories(test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 

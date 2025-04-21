@@ -11,11 +11,15 @@ set(BOX2D_SHARED_FILES
 	random.h
 )
 
-add_library(shared ${BOX2D_SHARED_FILES})
+add_library(shared STATIC ${BOX2D_SHARED_FILES})
 
 set_target_properties(shared PROPERTIES
 	C_STANDARD 17
 )
+
+if (BOX2D_COMPILE_WARNING_AS_ERROR)
+	set_target_properties(shared PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+endif()
 
 target_include_directories(shared PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(shared PRIVATE box2d)
