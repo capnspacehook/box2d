@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  release-linux-amd64:
+    name: release-linux-amd64
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update && \
+        sudo apt-get install -y --no-install-recommends \
+        ninja-build
+
+        sudo wget https://apt.llvm.org/llvm.sh
+        sudo chmod +x llvm.sh
+        sudo ./llvm.sh 20
+
+    - name: Configure CMake
+      run: |
+        cmake -B ${{github.workspace}}/build -GNinja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER=clang-20 \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DBOX2D_AVX2=ON \
+        -DBOX2D_DISABLE_SIMD=OFF \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBOX2D_SAMPLES=OFF \
+        -DBOX2D_VALIDATE=OFF \
+        -DBOX2D_UNIT_TESTS=OFF \
+        -DCMAKE_C_FLAGS="-DB2_MAX_WORLDS=65534"
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config Release
+
+    - name: Package
+      working-directory: ${{github.workspace}}/build
+      run: |
+        mkdir release
+        cp src/libbox2d.a release
+        cp -r ../include release
+        mkdir release/src
+        cp ../src/*.h release/src
+        tar -czvf box2d-linux-amd64.tar.gz release
+
+    - name: Create Tag
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "github-actions@users.noreply.github.com"
+        TAG="$(echo ${{github.sha}} | head -c 8)"
+        git tag "${TAG}"
+        git push origin "${TAG}"
+
+        echo "TAG=${TAG}" >> ${GITHUB_ENV}
+
+    - name: Upload Artifact to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ${{github.workspace}}/build/box2d-linux-amd64.tar.gz
+        tag_name: ${{env.TAG}}
