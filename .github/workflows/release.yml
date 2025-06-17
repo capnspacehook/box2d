@@ -3,8 +3,6 @@ name: Release
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ "*" ]
 
 jobs:
   release-linux-amd64-web:
@@ -92,10 +90,6 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
-
-    - name: Install dependencies
-      run: |
-        brew install ninja
 
     - name: Configure CMake
       run: |
