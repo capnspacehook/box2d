@@ -1,4 +1,4 @@
-name: Archives
+name: Release
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   release-linux-amd64:
-    name: linux-amd64
+    name: release-linux-amd64
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -27,6 +27,7 @@ jobs:
       run: |
         cmake -B ${{github.workspace}}/build -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER=clang-20 \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBOX2D_AVX2=ON \
         -DBOX2D_DISABLE_SIMD=OFF \
@@ -44,10 +45,23 @@ jobs:
       run: |
         mkdir release
         cp src/libbox2d.a release
-        cp -r ../include ../src/*.h release
+        cp -r ../include release
+        mkdir release/src
+        cp ../src/*.h release/src
         tar -czvf box2d-linux-amd64.tar.gz release
+
+    - name: Create Tag
+      run: |
+        git config user.name "GitHub Actions"
+        git config user.email "github-actions@users.noreply.github.com"
+        TAG="$(echo ${{github.sha}} | head -c 8)"
+        git tag "${TAG}"
+        git push origin "${TAG}"
+
+        echo "TAG=${TAG}" >> ${GITHUB_ENV}
 
     - name: Upload Artifact to Release
       uses: softprops/action-gh-release@v1
       with:
         files: ${{github.workspace}}/build/box2d-linux-amd64.tar.gz
+        tag_name: ${{env.TAG}}
