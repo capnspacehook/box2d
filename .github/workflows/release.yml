@@ -7,8 +7,8 @@ on:
     branches: [ "*" ]
 
 jobs:
-  release-linux-amd64:
-    name: release-linux-amd64
+  release-linux-amd64-web:
+    name: "Release Linux AMD64 and Web"
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -22,6 +22,9 @@ jobs:
         sudo wget https://apt.llvm.org/llvm.sh
         sudo chmod +x llvm.sh
         sudo ./llvm.sh 20
+
+    - name: Setup Emscripten
+      uses: mymindstorm/setup-emsdk@v14
 
     - name: Configure CMake
       run: |
@@ -37,18 +40,33 @@ jobs:
         -DBOX2D_UNIT_TESTS=OFF \
         -DCMAKE_C_FLAGS="-DB2_MAX_WORLDS=65534"
 
+        emcmake cmake -B ${{github.workspace}}/web-build -GNinja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_C_COMPILER=clang-20 \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DBOX2D_AVX2=ON \
+        -DBOX2D_DISABLE_SIMD=OFF \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DBOX2D_SAMPLES=OFF \
+        -DBOX2D_VALIDATE=OFF \
+        -DBOX2D_UNIT_TESTS=OFF \
+        -DCMAKE_C_FLAGS="-DB2_MAX_WORLDS=65534"
+
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
+      run: |
+        cmake --build ${{github.workspace}}/build --config Release
+        cmake --build ${{github.workspace}}/web-build --config Release
 
     - name: Package
-      working-directory: ${{github.workspace}}/build
       run: |
-        mkdir release
-        cp src/libbox2d.a release
-        cp -r ../include release
-        mkdir release/src
-        cp ../src/*.h release/src
+        mkdir -p release/src
+        cp -r include release
+        cp src/*.h release/src
+        cp -r release release-web
+        cp build/src/libbox2d.a release
+        cp web-build/src/libbox2d.a release-web
         tar -czvf box2d-linux-amd64.tar.gz release
+        tar -czvf box2d-web.tar.gz release-web
 
     - name: Create Tag
       run: |
@@ -61,14 +79,16 @@ jobs:
         echo "TAG=${TAG}" >> ${GITHUB_ENV}
 
     - name: Upload Artifact to Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
-        files: ${{github.workspace}}/build/box2d-linux-amd64.tar.gz
+        files: |
+          ${{github.workspace}}/box2d-linux-amd64.tar.gz
+          ${{github.workspace}}/box2d-web.tar.gz
         tag_name: ${{env.TAG}}
         make_latest: true
 
   release-macos-arm64:
-    name: release-macos-arm64
+    name: "Release macOS ARM64"
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
@@ -82,7 +102,6 @@ jobs:
         cmake -B ${{github.workspace}}/build -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        -DBOX2D_AVX2=ON \
         -DBOX2D_DISABLE_SIMD=OFF \
         -DBUILD_SHARED_LIBS=OFF \
         -DBOX2D_SAMPLES=OFF \
@@ -94,13 +113,11 @@ jobs:
       run: cmake --build ${{github.workspace}}/build --config Release
 
     - name: Package
-      working-directory: ${{github.workspace}}/build
       run: |
-        mkdir release
-        cp src/libbox2d.a release
-        cp -r ../include release
-        mkdir release/src
-        cp ../src/*.h release/src
+        mkdir -p release/src
+        cp build/src/libbox2d.a release
+        cp -r include release
+        cp src/*.h release/src
         tar -czvf box2d-macos-arm64.tar.gz release
 
     - name: Create Tag
@@ -114,7 +131,7 @@ jobs:
         echo "TAG=${TAG}" >> ${GITHUB_ENV}
 
     - name: Upload Artifact to Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: ${{github.workspace}}/build/box2d-macos-arm64.tar.gz
         tag_name: ${{env.TAG}}
