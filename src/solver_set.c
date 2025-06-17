@@ -9,7 +9,7 @@
 #include "core.h"
 #include "island.h"
 #include "joint.h"
-#include "world.h"
+#include "physics_world.h"
 
 #include <string.h>
 
@@ -61,6 +61,7 @@ void b2WakeSolverSet( b2World* world, int setIndex )
 
 		b2BodyState* state = b2BodyStateArray_Add( &awakeSet->bodyStates );
 		*state = b2_identityBodyState;
+		state->flags = body->flags;
 
 		// move non-touching contacts from disabled set to awake set
 		int contactKey = body->headContactKey;
@@ -549,6 +550,7 @@ void b2TransferBody( b2World* world, b2SolverSet* targetSet, b2SolverSet* source
 	{
 		b2BodyState* state = b2BodyStateArray_Add( &targetSet->bodyStates );
 		*state = b2_identityBodyState;
+		state->flags = body->flags;
 	}
 
 	body->setIndex = targetSet->setIndex;
