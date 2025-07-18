@@ -5,8 +5,8 @@ on:
     branches: [main]
 
 jobs:
-  release-linux-amd64-web:
-    name: "Release Linux AMD64 and Web"
+  release-linux-amd64-arm64-web:
+    name: "Release Linux AMD64, ARM64 and Web"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,7 +15,7 @@ jobs:
         run: |
           sudo apt-get update && \
           sudo apt-get install -y --no-install-recommends \
-          ninja-build
+          ninja-build gcc-aarch64-linux-gnu
 
           sudo wget https://apt.llvm.org/llvm.sh
           sudo chmod +x llvm.sh
@@ -38,6 +38,19 @@ jobs:
           -DBOX2D_UNIT_TESTS=OFF \
           -DCMAKE_C_FLAGS="-DB2_MAX_WORLDS=65534"
 
+          cmake -B ${{github.workspace}}/arm64-build -GNinja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+          -DCMAKE_SYSTEM_NAME=Linux \
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+          -DBOX2D_DISABLE_SIMD=OFF \
+          -DBUILD_SHARED_LIBS=OFF \
+          -DBOX2D_SAMPLES=OFF \
+          -DBOX2D_VALIDATE=OFF \
+          -DBOX2D_UNIT_TESTS=OFF \
+          -DCMAKE_C_FLAGS="-DB2_MAX_WORLDS=65534"
+
           emcmake cmake -B ${{github.workspace}}/web-build -GNinja \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_C_COMPILER=clang-20 \
@@ -53,6 +66,7 @@ jobs:
       - name: Build
         run: |
           cmake --build ${{github.workspace}}/build --config Release
+          cmake --build ${{github.workspace}}/arm64-build --config Release
           cmake --build ${{github.workspace}}/web-build --config Release
 
       - name: Package
@@ -60,10 +74,13 @@ jobs:
           mkdir -p box2d-linux-amd64/src
           cp -r include box2d-linux-amd64
           cp src/*.h box2d-linux-amd64/src
+          cp -r box2d-linux-amd64 box2d-linux-arm64
           cp -r box2d-linux-amd64 box2d-web
           cp build/src/libbox2d.a box2d-linux-amd64
+          cp arm64-build/src/libbox2d.a box2d-linux-arm64
           cp web-build/src/libbox2d.a box2d-web
           tar -czvf box2d-linux-amd64.tar.gz box2d-linux-amd64
+          tar -czvf box2d-linux-arm64.tar.gz box2d-linux-arm64
           tar -czvf box2d-web.tar.gz box2d-web
 
       - name: Create Tag
@@ -81,6 +98,7 @@ jobs:
         with:
           files: |
             ${{github.workspace}}/box2d-linux-amd64.tar.gz
+            ${{github.workspace}}/box2d-linux-arm64.tar.gz
             ${{github.workspace}}/box2d-web.tar.gz
           tag_name: ${{env.TAG}}
           make_latest: true
