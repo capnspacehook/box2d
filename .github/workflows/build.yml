@@ -2,163 +2,126 @@ name: CI Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-
-env:
-  BUILD_TYPE: Debug
+    branches: [main]
 
 jobs:
-  build-ubuntu-gcc:
-    name: ubuntu-gcc
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
-    steps:
-    - uses: actions/checkout@v4
+  build:
+    name: |
+      ${{ matrix.runs_on.name }}${{ matrix.compiler.name }}${{ matrix.build_type.name }}
+    runs-on: ${{ matrix.runs_on.runner }}
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        runs_on:
+          - name: ubuntu
+            runner: ubuntu-latest
+            test_path: "./bin/test"
+            cmake_system_flags: ""
+          - name: ubuntu-arm
+            runner: ubuntu-24.04-arm64
+            test_path: "./bin/test"
+            cmake_system_flags: ""
+          - name: macos
+            runner: macos-latest
+            test_path: "./bin/test"
+            cmake_system_flags: ""
+          - name: windows
+            runner: windows-latest
+            msvc_arch: x64
+            test_path: "./bin/Debug/test"
+            cmake_system_flags: ""
+          - name: windows-arm
+            runner: windows-11-arm
+            msvc_arch: arm64
+            test_path: "./bin/Debug/test"
+            cmake_system_flags: "-DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_SYSTEM_NAME=Windows"
 
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBOX2D_SAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DBOX2D_VALIDATE=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+        compiler:
+          - name: -clang
+            id: clang
+            cmake_compiler_flags: "-DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_C_COMPILER=clang"
+          - name: ""
+            id: default
+            cmake_compiler_flags: ""
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        build_type:
+          - name: ""
+            id: basic
+            cmake_build_type: Debug
+            cmake_samples: OFF
+            cmake_shared_libs: OFF
+            cmake_unit_tests: ON
+            cmake_sanitize: ON
+            cmake_validate: ON
+            cmake_warning_as_error: ON
+            build_config: Debug
+            run_tests: true
 
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ./bin/test
-      
-  build-ubuntu-clang:
-    name: ubuntu-clang
-    runs-on: ubuntu-latest
+          - name: "-samples-static"
+            id: samples-static
+            cmake_build_type: Release
+            cmake_samples: ON
+            cmake_shared_libs: OFF
+            cmake_unit_tests: OFF
+            cmake_sanitize: OFF
+            cmake_validate: OFF
+            cmake_warning_as_error: OFF
+            build_config: Release
+            run_tests: false
 
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CXX_COMPILER=clang++-18 -DCMAKE_C_COMPILER=clang -DBOX2D_SAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DBOX2D_VALIDATE=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
+          - name: "-samples-dynamic"
+            id: samples-dynamic
+            cmake_build_type: Release
+            cmake_samples: ON
+            cmake_shared_libs: ON
+            cmake_unit_tests: OFF
+            cmake_sanitize: OFF
+            cmake_validate: OFF
+            cmake_warning_as_error: OFF
+            build_config: Release
+            run_tests: false
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+        exclude:
+          # Only Ubuntu supports clang
+          - runs_on: { runner: macos-latest }
+            compiler: { id: clang }
+          - runs_on: { runner: windows-latest }
+            compiler: { id: clang }
+          - runs_on: { runner: windows-11-arm }
+            compiler: { id: clang }
 
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ./bin/test
-      
-  build-macos:
-    name: macos
-    runs-on: macos-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBOX2D_SAMPLES=OFF -DBOX2D_SANITIZE=ON -DBUILD_SHARED_LIBS=OFF -DBOX2D_VALIDATE=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
-
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ./bin/test
-      
-  build-windows:
-    name: windows
-    runs-on: windows-latest
-    steps:
-
-    - uses: actions/checkout@v4
-
-    - name: Setup MSVC dev command prompt
-      uses: TheMrMilchmann/setup-msvc-dev@v3
-      with:
-        arch: x64
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBOX2D_SAMPLES=OFF -DBOX2D_SANITIZE=ON -DBUILD_SHARED_LIBS=OFF -DBOX2D_VALIDATE=ON -DCMAKE_COMPILE_WARNING_AS_ERROR=ON
-      # run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DBOX2D_SAMPLES=OFF -DBUILD_SHARED_LIBS=OFF
-
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-
-    - name: Test
-      working-directory: ${{github.workspace}}/build
-      run: ./bin/${{env.BUILD_TYPE}}/test
-      
-  samples-windows-static:
-    name: samples-windows-static
-    runs-on: windows-latest
-    steps:
-
-    - uses: actions/checkout@v4
-
-    - name: Setup MSVC dev command prompt
-      uses: TheMrMilchmann/setup-msvc-dev@v3
-      with:
-        arch: x64
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=ON -DBUILD_SHARED_LIBS=OFF -DBOX2D_UNIT_TESTS=OFF
-      
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
-
-  samples-windows-dynamic:
-    name: samples-windows-dynamic
-    runs-on: windows-latest
-    steps:
-
-    - uses: actions/checkout@v4
-
-    - name: Setup MSVC dev command prompt
-      uses: TheMrMilchmann/setup-msvc-dev@v3
-      with:
-        arch: x64
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=ON -DBUILD_SHARED_LIBS=ON -DBOX2D_UNIT_TESTS=OFF
-      
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
-
-  samples-macos-static:
-    name: samples-macos-static
-    runs-on: macos-latest
+          # ARM platforms don't support samples
+          - runs_on: { runner: ubuntu-24.04-arm64 }
+            build_type: { id: samples-static }
+          - runs_on: { runner: ubuntu-24.04-arm64 }
+            build_type: { id: samples-dynamic }
+          - runs_on: { runner: windows-11-arm }
+            build_type: { id: samples-static }
+          - runs_on: { runner: windows-11-arm }
+            build_type: { id: samples-dynamic }
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=ON -DBUILD_SHARED_LIBS=OFF -DBOX2D_UNIT_TESTS=OFF
-      
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
+      - name: Install dependencies (Ubuntu samples)
+        if: ${{ matrix.runs_on.runner == 'ubuntu-latest' && (matrix.build_type.id == 'samples-static' || matrix.build_type.id == 'samples-dynamic') }}
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev wayland-protocols libwayland-dev libxkbcommon-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev
 
-  samples-macos-dynamic:
-    name: samples-macos-dynamic
-    runs-on: macos-latest
+      - name: Setup MSVC dev command prompt
+        if: ${{ matrix.runs_on.msvc_arch }}
+        uses: TheMrMilchmann/setup-msvc-dev@v3
+        with:
+          arch: ${{ matrix.runs_on.msvc_arch }}
 
-    steps:
-    - uses: actions/checkout@v4
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=${{ matrix.build_type.cmake_build_type }} ${{ matrix.compiler.cmake_compiler_flags }} ${{ matrix.runs_on.cmake_system_flags }} -DBOX2D_SAMPLES=${{ matrix.build_type.cmake_samples }} -DBUILD_SHARED_LIBS=${{ matrix.build_type.cmake_shared_libs }} -DBOX2D_UNIT_TESTS=${{ matrix.build_type.cmake_unit_tests }} -DBOX2D_SANITIZE=${{ matrix.build_type.cmake_sanitize }} -DBOX2D_VALIDATE=${{ matrix.build_type.cmake_validate }} -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ matrix.build_type.cmake_warning_as_error }}
 
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=ON -DBUILD_SHARED_LIBS=ON -DBOX2D_UNIT_TESTS=OFF
-      
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type.build_config }}
 
-  samples-ubuntu-gcc-static:
-    name: samples-ubuntu-gcc-static
-    runs-on: ubuntu-latest
-    timeout-minutes: 4
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install X11, Wayland & GL development libraries
-      run: sudo apt-get update && sudo apt-get install -y libx11-dev wayland-protocols libwayland-dev libxkbcommon-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libgl-dev
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release -DBOX2D_SAMPLES=ON -DBUILD_SHARED_LIBS=OFF -DBOX2D_UNIT_TESTS=OFF
-      
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
-      
+      - name: Test
+        if: ${{ matrix.build_type.run_tests }}
+        working-directory: build
+        run: ${{ matrix.runs_on.test_path }}
