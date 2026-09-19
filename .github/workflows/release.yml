@@ -19,7 +19,7 @@ jobs:
 
         sudo wget https://apt.llvm.org/llvm.sh
         sudo chmod +x llvm.sh
-        sudo ./llvm.sh 20
+        sudo ./llvm.sh 22
 
     - name: Setup Emscripten
       uses: mymindstorm/setup-emsdk@v14
@@ -28,7 +28,7 @@ jobs:
       run: |
         cmake -B ${{github.workspace}}/build -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_C_COMPILER=clang-20 \
+        -DCMAKE_C_COMPILER=clang-22 \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBOX2D_AVX2=ON \
         -DBOX2D_DISABLE_SIMD=OFF \
@@ -40,7 +40,7 @@ jobs:
 
         emcmake cmake -B ${{github.workspace}}/web-build -GNinja \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_C_COMPILER=clang-20 \
+        -DCMAKE_C_COMPILER=clang-22 \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DBOX2D_AVX2=ON \
         -DBOX2D_DISABLE_SIMD=OFF \
