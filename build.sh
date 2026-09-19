@@ -2,7 +2,8 @@
 
 # Use this to build box2d on any system with a bash shell
 rm -rf build
-mkdir build
-cd build
-cmake -DBOX2D_BUILD_DOCS=OFF DBOX2D_BUILD_STATIC=ON -DBOX2D_BUILD_SHARED=OFF ..
-cmake --build . 
+
+# I haven't been able to get Wayland working on WSL but X11 works.
+# https://www.glfw.org/docs/latest/compile.html
+cmake -S . -B build -DGLFW_BUILD_WAYLAND=OFF -DBOX2D_BUILD_DOCS=OFF DBOX2D_BUILD_STATIC=ON -DBOX2D_BUILD_SHARED=OFF
+cmake --build build
