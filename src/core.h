@@ -130,6 +130,7 @@
 
 #ifdef __cplusplus
 #define B2_TYPE_OF( A ) decltype( A )
+#define _Alignas( A ) alignas( A )
 #else
 #define B2_TYPE_OF( A ) __typeof__( A )
 #endif
